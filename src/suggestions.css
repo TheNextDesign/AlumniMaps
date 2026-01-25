@@ -1,0 +1,54 @@
+/* Suggestions Dropdown */
+.suggestions-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 8px;
+    background: var(--bg-card);
+    backdrop-filter: var(--glass);
+    -webkit-backdrop-filter: var(--glass);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    list-style: none;
+    padding: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    animation: slideDownFade 0.2s ease-out;
+}
+
+@keyframes slideDownFade {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.suggestions-list li {
+    padding: 10px 12px;
+    cursor: pointer;
+    border-radius: 8px;
+    color: var(--text-main);
+    font-size: 0.9rem;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.suggestions-list li:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.suggestions-list li .icon-small {
+    color: var(--text-muted);
+    width: 14px;
+    height: 14px;
+}

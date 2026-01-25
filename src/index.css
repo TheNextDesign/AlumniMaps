@@ -1,0 +1,1153 @@
+:root {
+  --bg-dark: #0f172a;
+  --bg-card: rgba(15, 23, 42, 0.75);
+  --bg-card-hover: rgba(30, 41, 59, 0.85);
+  --accent: #06b6d4;
+  /* Cyan 500 */
+  --accent-glow: rgba(6, 182, 212, 0.5);
+  --accent-hover: #0891b2;
+  --accent-secondary: #3b82f6;
+  /* Blue 500 */
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border: rgba(255, 255, 255, 0.08);
+  --glass: blur(16px) saturate(180%);
+  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-glow: 0 0 20px rgba(6, 182, 212, 0.15);
+}
+
+body {
+  margin: 0;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Glass Panel Utility */
+.glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+}
+
+/* Layout */
+.app-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background: var(--bg-dark);
+}
+
+/* TOP BAR (Search) */
+.top-bar {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  display: flex;
+  gap: 12px;
+  z-index: 1000;
+  /* Ensure it's above map but allows clicks */
+  pointer-events: none;
+  /* Let clicks pass through area */
+}
+
+/* Ensure School Search (first child) has higher z-index so dropdown covers City Search */
+.top-bar>.search-input-group {
+  z-index: 20;
+}
+
+.top-bar>.city-search-row {
+  z-index: 10;
+}
+
+.top-bar>* {
+  pointer-events: auto;
+  /* Re-enable clicks on inputs */
+}
+
+.search-input-group {
+  background: var(--bg-card);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border: 1px solid var(--border);
+  padding: 0 16px;
+  /* Use flex alignment instead of vertical padding */
+  height: 40px;
+  /* Fixed height for consistency */
+  border-radius: 50px;
+  /* Pill shape */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: var(--shadow-lg);
+  transition: all 0.3s ease;
+  min-width: 200px;
+}
+
+.search-input-group:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.15);
+  transform: translateY(-1px);
+}
+
+.search-input-group input {
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  outline: none;
+  font-size: 0.95rem;
+  width: 180px;
+  font-family: inherit;
+}
+
+.search-input-group .icon {
+  color: var(--text-muted);
+}
+
+.city-search-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  /* Ensure it doesn't break layout on desktop */
+}
+
+/* FLOATING ACTION BUTTON (Add Pin) */
+.sidebar-container {
+  position: absolute;
+  bottom: 40px;
+  left: 40px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column-reverse;
+  /* Panel grows upwards */
+  align-items: flex-start;
+  gap: 16px;
+}
+
+/* The FAB Trigger */
+.sidebar-trigger-btn {
+  background: #475569;
+  /* Slate 600 - Grey */
+  color: white;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  font-family: inherit;
+}
+
+.sidebar-trigger-btn:hover {
+  transform: scale(1.1) rotate(90deg);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
+}
+
+.sidebar-trigger-btn.active {
+  background: #ef4444;
+  /* Red for cancel */
+  box-shadow: 0 10px 30px rgba(239, 68, 68, 0.4);
+  transform: rotate(45deg);
+}
+
+.sidebar-trigger-btn svg {
+  width: 32px;
+  height: 32px;
+}
+
+/* The Panel (Form) */
+.sidebar-panel {
+  width: 300px;
+  /* Reduced width */
+  background: var(--bg-card);
+  backdrop-filter: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  /* Slightly tighter radius */
+  padding: 16px;
+  /* Reduced padding */
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* Reduced gap */
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.sidebar-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  /* Smaller title */
+  color: #fff;
+}
+
+.sidebar-header p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  /* Smaller text */
+}
+
+/* Stats Pill - Move to Bottom Left to balance */
+.stats-pill {
+  position: absolute;
+  bottom: 40px;
+  right: 40px;
+  /* Reset right */
+  background: var(--bg-card);
+  backdrop-filter: var(--glass);
+  padding: 8px 16px;
+  /* Smaller pill */
+  border-radius: 50px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  z-index: 1000;
+  box-shadow: var(--shadow-lg);
+}
+
+/* Pin Mode Instruction */
+.pin-instruction {
+  background: rgba(6, 182, 212, 0.1);
+  color: var(--accent);
+  padding: 10px;
+  /* Smaller padding */
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px dashed rgba(6, 182, 212, 0.3);
+}
+
+/* Form Styling */
+.add-pin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Tighter form */
+  animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.add-pin-form input {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 12px;
+  /* Compact input */
+  border-radius: 8px;
+  color: white;
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.add-pin-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.btn-submit,
+.btn-cancel {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+
+.btn-submit {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-submit:hover {
+  background: var(--accent-hover);
+}
+
+.btn-cancel {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+}
+
+.btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Mobile Responsive */
+@media (max-width: 700px) {
+  .top-bar {
+    flex-direction: column;
+    width: calc(100% - 40px);
+    gap: 10px;
+  }
+
+  .search-input-group {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .search-input-group input {
+    width: 100%;
+  }
+
+  .sidebar-container {
+    top: auto;
+    bottom: 30px;
+    left: 20px;
+    right: 20px;
+    width: auto;
+    align-items: stretch;
+  }
+
+  .sidebar-trigger-btn {
+    justify-content: center;
+  }
+
+  .sidebar-panel {
+    width: 100%;
+    /* Full width on mobile */
+    box-sizing: border-box;
+    max-height: 60vh;
+  }
+}
+
+.add-pin-form input {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  padding: 12px 14px;
+  border-radius: 12px;
+  color: white;
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.add-pin-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+}
+
+.row input {
+  width: 100%;
+}
+
+.btn-submit {
+  background: var(--text-main);
+  color: var(--bg-dark);
+  border: none;
+  padding: 12px;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.btn-submit:hover {
+  background: #fff;
+  transform: scale(1.02);
+}
+
+.btn-submit:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+/* Stats */
+.stats {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  text-align: center;
+  font-weight: 500;
+}
+
+/* Leaflet Map Specifics */
+.leaflet-container {
+  background: #111;
+  /* Clean dark bg */
+  font-family: 'Outfit', sans-serif !important;
+}
+
+/* Premium Popup */
+.leaflet-popup-content-wrapper {
+  background: rgba(15, 23, 42, 0.95) !important;
+  backdrop-filter: blur(12px) !important;
+  color: var(--text-main) !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6) !important;
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.leaflet-popup-content {
+  margin: 16px !important;
+  width: 240px !important;
+}
+
+.leaflet-popup-tip {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: none;
+  border-left: none;
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+  color: var(--text-muted) !important;
+  font-size: 20px !important;
+  padding: 8px !important;
+  transition: color 0.2s;
+}
+
+.leaflet-container a.leaflet-popup-close-button:hover {
+  color: #fff !important;
+}
+
+.pin-popup h3 {
+  margin: 0 0 12px 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 8px;
+}
+
+.pin-popup .tag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.pin-popup .tag svg {
+  color: var(--accent);
+  min-width: 16px;
+}
+
+.pin-popup .tag strong {
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+.contact-info {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.15);
+  font-size: 0.85rem;
+  color: var(--accent-secondary);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Animations */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.33);
+  }
+
+  80%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-dot {
+  0% {
+    transform: scale(0.8);
+  }
+
+  50% {
+    transform: scale(1);
+  }
+
+  100% {
+    transform: scale(0.8);
+  }
+}
+
+/* Mobile Responsive */
+@media (max-width: 700px) {
+
+  /* Center Search Bars */
+  .top-bar {
+    left: 50%;
+    transform: translateX(-50%);
+    width: 95%;
+    /* Slightly wider on mobile */
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    /* More space between school and city rows */
+    top: 20px;
+    height: auto;
+    max-height: 80vh;
+    /* Prevent overflow if list is huge */
+    overflow-y: visible;
+    /* Allow content to flow */
+  }
+
+  .city-search-row {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    /* Align top so button stays with input if list grows */
+    gap: 10px;
+  }
+
+  .city-search-row .search-input-group {
+    flex: 1;
+    /* Search bar takes remaining space */
+    width: auto;
+    /* Override 100% width */
+  }
+
+  /* Smaller Search Inputs */
+  /* Smaller Search Inputs */
+  .search-input-group {
+    width: 100%;
+    min-width: unset;
+    padding: 8px 12px;
+    height: auto;
+    /* Allow growth for suggestions */
+    min-height: 40px;
+    box-sizing: border-box;
+    background: rgba(15, 23, 42, 0.95);
+    /* High opacity */
+    flex-wrap: wrap;
+    /* Allow suggestions to wrap to new line */
+  }
+
+  /* Suggestions in Flow for Mobile */
+  .suggestions-list {
+    position: static;
+    width: 100%;
+    box-shadow: none;
+    background: transparent;
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 8px;
+    padding: 0;
+    max-height: 250px;
+    /* Limit height slightly less on mobile */
+    animation: none;
+    transform: none;
+  }
+
+  .suggestions-list li {
+    padding: 12px 8px;
+    /* Larger touch targets */
+    background: transparent;
+  }
+
+  .suggestions-list li:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .search-input-group input {
+    font-size: 0.9rem;
+    width: auto;
+    flex: 1;
+    /* Take available width on line 1 */
+  }
+
+  .search-input-group .icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* Adjust Sidebar / Add Pin Trigger */
+  .sidebar-container {
+    bottom: 20px;
+    left: 20px;
+    top: auto;
+    transform: none;
+    width: auto;
+    align-items: flex-start;
+  }
+
+  .sidebar-trigger-btn {
+    width: 56px;
+    height: 56px;
+  }
+
+  .sidebar-trigger-btn svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  .sidebar-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    border-radius: 20px 20px 0 0;
+    max-height: 75vh;
+    animation: slideUpPanel 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes slideUpPanel {
+    from {
+      transform: translateY(100%);
+    }
+
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  /* Move stats pill to bottom right */
+  /* Move stats pill to bottom right */
+  .stats-pill {
+    bottom: 30px;
+    right: 20px;
+    left: auto;
+    transform: none;
+    width: auto;
+    font-size: 0.75rem;
+    /* Smaller font */
+    padding: 6px 12px;
+    /* Smaller padding */
+  }
+}
+
+/* Suggestions Dropdown */
+.suggestions-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 8px;
+  background: var(--bg-card);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  list-style: none;
+  padding: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  animation: slideDownFade 0.2s ease-out;
+}
+
+@keyframes slideDownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.suggestions-list li {
+  padding: 10px 12px;
+  cursor: pointer;
+  border-radius: 8px;
+  color: var(--text-main);
+  font-size: 0.9rem;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.suggestions-list li:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.suggestions-list li .icon-small {
+  color: var(--text-muted);
+  width: 14px;
+  height: 14px;
+}
+
+/* Custom Tooltip Styling */
+.custom-tooltip {
+  background-color: #0f172a !important;
+  /* Dark Slate to match card bg */
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
+  box-sizing: border-box;
+}
+
+/* Override Leaflet's default white background/border */
+.leaflet-tooltip.custom-tooltip {
+  background-color: #0f172a;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+/* Arrow styling */
+.leaflet-tooltip-bottom:before {
+  border-bottom-color: #0f172a !important;
+}
+
+.leaflet-tooltip-top:before {
+  border-top-color: #0f172a !important;
+}
+
+.leaflet-tooltip-left:before {
+  border-left-color: #0f172a !important;
+}
+
+.leaflet-tooltip-right:before {
+  border-right-color: #0f172a !important;
+}
+
+/* Custom Avatar Markers */
+.custom-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.marker-avatar-container {
+  position: relative;
+  width: 50px;
+  height: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.marker-avatar-container::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 20px solid var(--accent);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.marker-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--accent);
+  background: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  position: relative;
+  z-index: 2;
+}
+
+.marker-avatar-placeholder {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 16px;
+  border: 3px solid var(--accent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  text-transform: uppercase;
+  position: relative;
+  z-index: 2;
+}
+
+.marker-avatar-placeholder::after {
+  content: '';
+  position: absolute;
+  bottom: -23px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 20px solid var(--accent);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  z-index: 1;
+}
+
+.marker-name-label {
+  position: absolute;
+  top: 8px;
+  left: 45px;
+  background: rgba(0, 0, 0, 0.85);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  z-index: 0;
+  pointer-events: none;
+}
+
+
+
+/* Alumni Detail Card (Bottom Right) */
+.alumni-detail-card {
+  position: absolute;
+  bottom: 40px;
+  right: 40px;
+  width: 300px;
+  background: var(--bg-card);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border: 1px solid var(--border);
+  padding: 20px;
+  border-radius: 20px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  animation: slideUpCard 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ... existing Detail Card styles ... */
+/* NOTE: Keeping the rest of detail card styles implied if not replacing full block. */
+/* Appending new styles below */
+
+/* TOAST NOTIFICATIONS */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+  /* Allow clicking through container */
+}
+
+.toast {
+  pointer-events: auto;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 12px 16px;
+  border-radius: 50px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  min-width: 300px;
+  max-width: 90vw;
+  animation: slideDownToast 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  color: #fff;
+}
+
+@keyframes slideDownToast {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-success {
+  border-left: 4px solid #4ade80;
+}
+
+.toast-error {
+  border-left: 4px solid #f87171;
+}
+
+.toast-info {
+  border-left: 4px solid #60a5fa;
+}
+
+.toast-message {
+  font-size: 0.9rem;
+  font-weight: 500;
+  flex: 1;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+}
+
+.toast-close:hover {
+  color: #fff;
+}
+
+.text-green-400 {
+  color: #4ade80;
+}
+
+.text-red-400 {
+  color: #f87171;
+}
+
+.text-blue-400 {
+  color: #60a5fa;
+}
+
+/* NEAR ME BUTTON */
+.near-me-btn {
+  background: var(--bg-card);
+  backdrop-filter: var(--glass);
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  width: 40px;
+  /* match height of inputs */
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: var(--shadow-sm);
+}
+
+.near-me-btn:hover {
+  background: var(--accent);
+  color: #fff;
+  transform: scale(1.05);
+}
+
+.near-me-btn.active {
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 0 15px var(--accent-glow);
+}
+
+
+@keyframes slideUpCard {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.alumni-detail-card h3 {
+  margin: 0;
+  font-size: 1.35rem;
+  color: #fff;
+  font-weight: 700;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 10px;
+  margin-bottom: 4px;
+}
+
+.close-card-btn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.close-card-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.detail-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  color: var(--text-main);
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.detail-row svg {
+  min-width: 18px;
+  /* Prevent shrinking */
+  margin-top: 3px;
+}
+
+.detail-highlight {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.detail-sub {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.detail-row.contact {
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+  color: var(--accent-secondary);
+}
+
+.whatsapp-btn-full {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #25D366;
+  color: white;
+  padding: 10px;
+  border-radius: 12px;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-top: 10px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 15px rgba(37, 211, 102, 0.3);
+}
+
+.whatsapp-btn-full:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(37, 211, 102, 0.4);
+}
+
+/* Mobile Adjustments for Detail Card */
+@media (max-width: 700px) {
+  .alumni-detail-card {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    left: 0;
+    width: 100%;
+    border-radius: 20px 20px 0 0;
+    box-sizing: border-box;
+    padding-bottom: 30px;
+    /* Safe area */
+    animation: slideUpPanel 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+/* FINAL MOBILE OVERRIDES TO FIX SUGGESTION OVERLAP */
+@media (max-width: 700px) {
+
+  /* Revert to Absolute Positioning so it floats OVER the city bar */
+  .suggestions-list {
+    position: absolute !important;
+    top: 100% !important;
+    left: 0 !important;
+    width: 100% !important;
+    margin-top: 8px !important;
+    z-index: 9999 !important;
+    /* Ensure it stays on top */
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8) !important;
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    max-height: 50vh !important;
+    /* Allow more height overlay */
+  }
+
+  /* Keep the search bar fixed shape, do not wrap or expand */
+  .search-input-group {
+    height: 40px !important;
+    /* Fixed height match touch target */
+    flex-wrap: nowrap !important;
+    overflow: visible !important;
+    /* Allow dropdown to spill out */
+  }
+
+  /* Reset input to standard behavior */
+  .search-input-group input {
+    flex: 1 !important;
+    width: 100% !important;
+  }
+}
