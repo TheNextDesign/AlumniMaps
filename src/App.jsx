@@ -17,10 +17,11 @@ L.Icon.Default.mergeOptions({
 });
 
 // Custom component to handle map clicks
-function MapEvents({ onMapClick }) {
+function MapEvents({ onMapClick, closeOverlays }) {
   useMapEvents({
     click: (e) => {
       onMapClick(e.latlng);
+      if (closeOverlays) closeOverlays();
     },
   });
   return null;
@@ -698,7 +699,16 @@ function App() {
           url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&hl=en"
         />
 
-        <MapEvents onMapClick={handleMapClick} />
+        <MapEvents
+          onMapClick={handleMapClick}
+          closeOverlays={() => {
+            setShowSchoolSearchDropdown(false);
+            setSuggestions([]);
+            // Also close sidebar form suggestions if open
+            setShowSchoolDropdown(false);
+            setFormCitySuggestions([]);
+          }}
+        />
 
         {/* Render Existing Pins */}
         {filteredPins.map(pin => {
