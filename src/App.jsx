@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMapEvents, ZoomControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { MapPin, Search, GraduationCap, Briefcase, Phone, Menu, X, Plus, School, LocateFixed } from 'lucide-react';
+import { MapPin, Search, GraduationCap, Briefcase, Phone, Menu, X, Plus, School, LocateFixed, ChevronDown, ChevronUp } from 'lucide-react';
 import './index.css';
 import indianSchools from './indian_institutes.json'; // Import the list
 import { supabase } from './supabaseClient'; // Import Supabase Client
@@ -67,6 +67,7 @@ function App() {
   // Add Pin Mode State
   const [addStep, setAddStep] = useState(0); // 0=Closed, 1=Pre-Form, 2=Pick-Location, 3=Details-Form
   const [newPinLoc, setNewPinLoc] = useState(null);
+  const [formMinimized, setFormMinimized] = useState(false); // Track if form is minimized
 
   // Avatar Upload State
   const [avatarFile, setAvatarFile] = useState(null);
@@ -627,82 +628,94 @@ function App() {
 
         {/* STEP 3: Final Details Form */}
         {addStep === 3 && newPinLoc && (
-          <div className="sidebar-panel">
+          <div className={`sidebar-panel ${formMinimized ? 'minimized' : ''}`}>
             <div className="sidebar-header">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', width: '100%' }}>
                 <div>
                   <h2>Final Step</h2>
-                  <p>Tell us about yourself!</p>
+                  {!formMinimized && <p>Tell us about yourself!</p>}
                 </div>
-                <button
-                  onClick={() => {
-                    setAddStep(0);
-                    setNewPinLoc(null);
-                  }}
-                  className="btn-icon-close"
-                  title="Close"
-                >
-                  <X size={20} />
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => setFormMinimized(!formMinimized)}
+                    className="btn-icon-minimize"
+                    title={formMinimized ? "Expand form" : "Minimize to adjust pin"}
+                  >
+                    {formMinimized ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAddStep(0);
+                      setNewPinLoc(null);
+                      setFormMinimized(false);
+                    }}
+                    className="btn-icon-close"
+                    title="Close"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
             </div>
 
-            <form className="add-pin-form" onSubmit={handleSubmit}>
-              <div className="row">
-                <input name="school_name" value={formData.school_name} disabled style={{ opacity: 0.7 }} />
-                <input name="city" value={formData.city} disabled style={{ opacity: 0.7 }} />
-              </div>
+            {!formMinimized && (
+              <form className="add-pin-form" onSubmit={handleSubmit}>
+                <div className="row">
+                  <input name="school_name" value={formData.school_name} disabled style={{ opacity: 0.7 }} />
+                  <input name="city" value={formData.city} disabled style={{ opacity: 0.7 }} />
+                </div>
 
-              <input name="full_name" placeholder="Full Name" required onChange={handleInputChange} autoFocus />
-              <input name="batch_year" placeholder="Batch Year (e.g. 2024)" type="number" onChange={handleInputChange} />
-              <input name="profession" placeholder="Profession" onChange={handleInputChange} />
-              <input name="company" placeholder="Company" onChange={handleInputChange} />
-              <input name="mobile_number" placeholder="Mobile No. (for WhatsApp)" type="tel" onChange={handleInputChange} />
+                <input name="full_name" placeholder="Full Name" required onChange={handleInputChange} autoFocus />
+                <input name="batch_year" placeholder="Batch Year (e.g. 2024)" type="number" onChange={handleInputChange} />
+                <input name="profession" placeholder="Profession" onChange={handleInputChange} />
+                <input name="company" placeholder="Company" onChange={handleInputChange} />
+                <input name="mobile_number" placeholder="Mobile No. (for WhatsApp)" type="tel" onChange={handleInputChange} />
 
-              {/* Avatar Upload */}
-              <div style={{ marginTop: '10px' }}>
-                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                  Profile Picture (Optional, max 200KB)
-                </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="user"
-                  onChange={handleAvatarChange}
-                  style={{
-                    padding: '8px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    backgroundColor: 'var(--bg-card)',
-                    color: 'var(--text-main)',
-                    width: '100%'
-                  }}
-                />
-                {avatarPreview && (
-                  <div style={{ marginTop: '10px', textAlign: 'center' }}>
-                    <img
-                      src={avatarPreview}
-                      alt="Preview"
-                      style={{
-                        width: '80px',
-                        height: '80px',
-                        borderRadius: '50%',
-                        objectFit: 'cover',
-                        border: '2px solid var(--accent)'
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
+                {/* Avatar Upload */}
+                <div style={{ marginTop: '10px' }}>
+                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                    Profile Picture (Optional, max 200KB)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="user"
+                    onChange={handleAvatarChange}
+                    style={{
+                      padding: '8px',
+                      border: '1px solid var(--border)',
+                      borderRadius: '8px',
+                      backgroundColor: 'var(--bg-card)',
+                      color: 'var(--text-main)',
+                      width: '100%'
+                    }}
+                  />
+                  {avatarPreview && (
+                    <div style={{ marginTop: '10px', textAlign: 'center' }}>
+                      <img
+                        src={avatarPreview}
+                        alt="Preview"
+                        style={{
+                          width: '80px',
+                          height: '80px',
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                          border: '2px solid var(--accent)'
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
 
-              <input name="contact_info" placeholder="Email/LinkedIn (Optional)" onChange={handleInputChange} />
+                <input name="contact_info" placeholder="Email/LinkedIn (Optional)" onChange={handleInputChange} />
 
-              <div className="form-actions">
-                <button type="submit" disabled={submitting} className="btn-submit">
-                  {submitting ? "Pinning..." : "Confirm & Join Map"}
-                </button>
-              </div>
-            </form>
+                <div className="form-actions">
+                  <button type="submit" disabled={submitting} className="btn-submit">
+                    {submitting ? "Pinning..." : "Confirm & Join Map"}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         )}
       </div>
@@ -865,10 +878,28 @@ function App() {
           );
         })}
 
-        {/* Temporary Marker for New Pin */}
+        {/* Temporary Marker for New Pin - Draggable */}
         {newPinLoc && (
-          <Marker position={newPinLoc} opacity={0.8}>
-            <Popup>New Pin Location</Popup>
+          <Marker
+            position={newPinLoc}
+            opacity={0.8}
+            draggable={true}
+            eventHandlers={{
+              dragend: (e) => {
+                const marker = e.target;
+                const position = marker.getLatLng();
+                setNewPinLoc([position.lat, position.lng]);
+              }
+            }}
+          >
+            <Popup>
+              <div style={{ textAlign: 'center' }}>
+                <strong>New Pin Location</strong>
+                <p style={{ margin: '5px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  Drag to adjust position
+                </p>
+              </div>
+            </Popup>
           </Marker>
         )}
       </MapContainer>

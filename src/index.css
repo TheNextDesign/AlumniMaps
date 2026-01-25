@@ -225,14 +225,17 @@ body {
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--border);
   border-radius: 16px;
-  padding: 16px 14px;
+  padding: 0;
+  /* Remove padding, add to children */
   box-shadow: var(--shadow-lg);
   animation: slideUpFade 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-height: calc(100vh - 120px);
-  overflow-y: auto;
+
+  max-height: 500px;
+  /* Fixed height instead of viewport-based */
+  overflow: hidden;
+  /* Hide overflow, let children scroll */
   margin-bottom: 20px;
 }
 
@@ -262,6 +265,67 @@ body {
   font-size: 0.75rem;
 }
 
+/* Sidebar header - no scroll */
+.sidebar-header {
+  padding: 16px 14px 10px;
+  flex-shrink: 0;
+}
+
+/* Form content - scrollable */
+.add-pin-form {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Form actions - sticky at bottom */
+.form-actions {
+  position: sticky;
+  bottom: 0;
+  background: var(--bg-card);
+  padding: 12px 14px 16px;
+  margin: 0 -14px -16px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* File input styling */
+.add-pin-form input[type="file"] {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.add-pin-form input[type="file"]::file-selector-button {
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-right: 10px;
+  transition: all 0.2s;
+}
+
+.add-pin-form input[type="file"]::file-selector-button:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.add-pin-form input[type="file"]:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .btn-icon-close {
   background: rgba(255, 255, 255, 0.1);
   border: none;
@@ -281,6 +345,36 @@ body {
   background: rgba(255, 255, 255, 0.2);
   color: white;
   transform: rotate(90deg);
+}
+
+.btn-icon-minimize {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-icon-minimize:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+/* Minimized state for sidebar panel */
+.sidebar-panel.minimized {
+  max-height: 60px;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.sidebar-panel:not(.minimized) {
+  transition: max-height 0.3s ease;
 }
 
 /* Stats Pill - Move to Bottom Left to balance */
@@ -711,8 +805,8 @@ body {
     left: 0;
     width: 100%;
     border-radius: 20px 20px 0 0;
-    max-height: 75vh;
-    max-height: 75dvh;
+    max-height: 65vh;
+    max-height: 65dvh;
     animation: slideUpPanel 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     /* Add padding at bottom for safe area */
     padding-bottom: calc(16px + env(safe-area-inset-bottom));
