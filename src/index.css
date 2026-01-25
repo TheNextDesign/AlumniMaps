@@ -972,7 +972,8 @@ body {
   height: 0;
   border-left: 12px solid transparent;
   border-right: 12px solid transparent;
-  border-top: 20px solid var(--accent);
+  border-top: 20px solid #001030;
+  /* Dark Blue Pin */
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
@@ -981,7 +982,8 @@ body {
   height: 36px;
   border-radius: 50%;
   object-fit: cover;
-  border: 3px solid var(--accent);
+  border: 3px solid #001030;
+  /* Dark Blue Border */
   background: white;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   position: relative;
@@ -992,14 +994,16 @@ body {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%);
-  color: white;
+  /* background-color color set in JS */
+  color: #001030;
+  /* Dark text for better contrast */
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
   font-size: 16px;
-  border: 3px solid var(--accent);
+  border: 3px solid #001030;
+  /* Dark Blue Border */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   text-transform: uppercase;
   position: relative;
@@ -1016,7 +1020,8 @@ body {
   height: 0;
   border-left: 12px solid transparent;
   border-right: 12px solid transparent;
-  border-top: 20px solid var(--accent);
+  border-top: 20px solid #001030;
+  /* Dark Blue Pin */
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
   z-index: 1;
 }

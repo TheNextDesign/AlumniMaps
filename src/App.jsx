@@ -7,6 +7,7 @@ import './index.css';
 import indianSchools from './indian_institutes.json'; // Import the list
 import { supabase } from './supabaseClient'; // Import Supabase Client
 import Toast from './Toast'; // New Toast Component
+import { Analytics } from '@vercel/analytics/react';
 
 // Fix for default Leaflet marker icons in React
 delete L.Icon.Default.prototype._getIconUrl;
@@ -749,6 +750,18 @@ function App() {
 
         {/* Render Existing Pins */}
         {filteredPins.map(pin => {
+          // Generate consistent color based on name
+          const getAvatarColor = (name) => {
+            const colors = [
+              '#FFCB42', '#FF6B6B', '#4ECDC4', '#45B7D1',
+              '#FFA07A', '#98D8C8', '#BB8FCE', '#85C1E2',
+              '#F8B739', '#52B788'
+            ];
+            const charCode = name.charCodeAt(0) || 0;
+            return colors[charCode % colors.length];
+          };
+          const avatarBgColor = getAvatarColor(pin.full_name);
+
           // Create custom icon with avatar
           const customIcon = L.divIcon({
             className: 'custom-marker',
@@ -757,7 +770,7 @@ function App() {
                    <img src="${pin.avatar_url}" class="marker-avatar" alt="${pin.full_name}" />
                  </div>
                  <div class="marker-name-label">${pin.full_name}</div>`
-              : `<div class="marker-avatar-placeholder">${pin.full_name.charAt(0)}</div>
+              : `<div class="marker-avatar-placeholder" style="background-color: ${avatarBgColor}">${pin.full_name.charAt(0)}</div>
                  <div class="marker-name-label">${pin.full_name}</div>`,
             iconSize: [50, 80],
             iconAnchor: [25, 60],
@@ -909,6 +922,7 @@ function App() {
           {`Found ${filteredPins.length} Alumni`}
         </div>
       )}
+      <Analytics />
     </div>
   );
 }
