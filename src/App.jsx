@@ -533,8 +533,19 @@ function App() {
         {addStep === 1 && (
           <div className="sidebar-panel">
             <div className="sidebar-header">
-              <h2>Step 1/2 🚀</h2>
-              <p>Where are you from?</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', width: '100%' }}>
+                <div>
+                  <h2>Step 1/2</h2>
+                  <p>Where are you from?</p>
+                </div>
+                <button
+                  onClick={() => setAddStep(0)}
+                  className="btn-icon-close"
+                  title="Close"
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             <form className="add-pin-form" onSubmit={handleStep1Submit} onClick={() => { setShowSchoolDropdown(false); setFormCitySuggestions([]); }}>
@@ -601,7 +612,7 @@ function App() {
               </div>
 
               <button type="submit" className="btn-submit">
-                Next: Place Pin 📍
+                Next: Place Pin
               </button>
             </form>
           </div>
@@ -618,8 +629,22 @@ function App() {
         {addStep === 3 && newPinLoc && (
           <div className="sidebar-panel">
             <div className="sidebar-header">
-              <h2>Final Step ✅</h2>
-              <p>Tell us about yourself!</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', width: '100%' }}>
+                <div>
+                  <h2>Final Step</h2>
+                  <p>Tell us about yourself!</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setAddStep(0);
+                    setNewPinLoc(null);
+                  }}
+                  className="btn-icon-close"
+                  title="Close"
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             <form className="add-pin-form" onSubmit={handleSubmit}>
