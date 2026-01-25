@@ -409,6 +409,31 @@ body {
   border: 1px dashed rgba(56, 189, 248, 0.3);
 }
 
+/* Compact instruction for mobile */
+.pin-instruction-compact {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-card);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border: 1px solid var(--border);
+  padding: 12px 24px;
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  max-width: 90%;
+  text-align: center;
+}
+
+.pin-instruction-compact p {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
 /* Form Styling */
 .add-pin-form {
   display: flex;

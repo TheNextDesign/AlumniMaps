@@ -621,8 +621,8 @@ function App() {
 
         {/* STEP 2: Pick Location Instruction */}
         {addStep === 2 && (
-          <div className="sidebar-panel" style={{ width: 'auto', textAlign: 'center' }}>
-            <h3>📍 Tap on your exact location on the map</h3>
+          <div className="pin-instruction-compact">
+            <p>Tap your exact location on the map</p>
           </div>
         )}
 
@@ -728,7 +728,6 @@ function App() {
         style={{ height: "100vh", width: "100%" }}
         zoomControl={false} // Custom zoom control position if needed, or default
       >
-        <ZoomControl position="bottomright" />
         <MapController center={flyToLocation} />
 
         {/* Google Maps Tiles - Colorful & Strictly English (hl=en) */}
