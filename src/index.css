@@ -36,6 +36,11 @@ body {
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Mobile safe area support */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  /* Prevent pull-to-refresh */
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Custom Scrollbar */
@@ -71,7 +76,11 @@ body {
   position: relative;
   width: 100vw;
   height: 100vh;
+  /* Use dynamic viewport height for mobile browsers */
+  height: 100dvh;
   background: var(--bg-dark);
+  /* Ensure it fills the screen properly on mobile */
+  min-height: -webkit-fill-available;
 }
 
 /* TOP BAR (Search) */
@@ -661,7 +670,7 @@ body {
 
   /* Adjust Sidebar / Add Pin Trigger */
   .sidebar-container {
-    bottom: 20px;
+    bottom: calc(20px + env(safe-area-inset-bottom));
     left: 20px;
     top: auto;
     transform: none;
@@ -686,7 +695,10 @@ body {
     width: 100%;
     border-radius: 20px 20px 0 0;
     max-height: 75vh;
+    max-height: 75dvh;
     animation: slideUpPanel 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    /* Add padding at bottom for safe area */
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
   }
 
   @keyframes slideUpPanel {
