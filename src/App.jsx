@@ -110,6 +110,7 @@ function App() {
 
   const [filterCity, setFilterCity] = useState('');
   const [flyToLocation, setFlyToLocation] = useState(null); // { lat, lng }
+  const [searchLocation, setSearchLocation] = useState(null); // [lat, lng] for filtering
 
   // Add Pin Mode State
   const [addStep, setAddStep] = useState(0); // 0=Closed, 1=Pre-Form, 2=Pick-Location, 3=Details-Form
@@ -386,12 +387,19 @@ function App() {
   }, [filterCity]);
 
   const handleCityChange = (e) => {
-    setFilterCity(e.target.value);
+    const val = e.target.value;
+    setFilterCity(val);
+    if (!val.trim()) {
+      setSearchLocation(null);
+    }
   };
 
   const selectSuggestion = (s) => {
+    const lat = parseFloat(s.lat);
+    const lon = parseFloat(s.lon);
     setFilterCity(s.display_name.split(',')[0]);
-    setFlyToLocation([parseFloat(s.lat), parseFloat(s.lon)]);
+    setFlyToLocation([lat, lon]);
+    setSearchLocation([lat, lon]);
     setSuggestions([]);
   };
 
@@ -404,8 +412,10 @@ function App() {
           const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(filterCity)}&accept-language=en&limit=1`);
           const data = await response.json();
           if (data && data.length > 0) {
-            const { lat, lon } = data[0];
-            setFlyToLocation([parseFloat(lat), parseFloat(lon)]);
+            const lat = parseFloat(data[0].lat);
+            const lon = parseFloat(data[0].lon);
+            setFlyToLocation([lat, lon]);
+            setSearchLocation([lat, lon]);
           }
         } catch (err) { }
       }
@@ -469,6 +479,14 @@ function App() {
     if (!filterSchool.trim()) return false;
 
     const schoolMatch = p.school_name.toLowerCase().includes(filterSchool.toLowerCase());
+
+    // If a specific search location is set (via Enter or Suggestion), filter by distance (50km)
+    if (searchLocation) {
+      const dist = getDistanceFromLatLonInKm(searchLocation[0], searchLocation[1], p.latitude, p.longitude);
+      return schoolMatch && dist <= 50;
+    }
+
+    // Otherwise use text-based city filter (or show all if search is empty)
     const cityMatch = p.city.toLowerCase().includes(filterCity.toLowerCase());
 
     // If Near Me is active, also apply proximity filter
