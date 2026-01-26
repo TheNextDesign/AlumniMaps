@@ -690,6 +690,14 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.contact-info a {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
 }
 
 /* Animations */
@@ -993,6 +1001,11 @@ body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   position: relative;
   z-index: 2;
+}
+
+.marker-logo-fit {
+  object-fit: contain !important;
+  padding: 2px;
 }
 
 .marker-avatar-placeholder {
@@ -1392,10 +1405,15 @@ body {
   color: var(--text-muted);
 }
 
-.welcome-icon {
+.welcome-logo {
+  width: 80px;
+  height: 80px;
   margin: 0 auto;
-  color: #fff;
-  opacity: 0.9;
+  object-fit: contain;
+  border-radius: 12px;
+  background: white;
+  padding: 5px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
 .welcome-search-group {

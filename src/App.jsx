@@ -516,7 +516,7 @@ function App() {
       <div className="welcome-screen">
         <div className="welcome-card glass-panel">
           <div className="welcome-header">
-            <School size={48} className="welcome-icon" />
+            <img src="/letscatchup-logo.jpg" alt="LetsCatchUp Logo" className="welcome-logo" />
             <h1>LetsCatchUp</h1>
             <p>Connect with your fellow alumni across the globe</p>
           </div>
@@ -570,7 +570,7 @@ function App() {
       <div className="top-bar">
         <div className="school-branding glass-panel no-click">
           <div className="branding-icon-container">
-            <School size={20} />
+            <img src="/letscatchup-logo.jpg" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
           </div>
           <div className="branding-text">
             <h2>{selectedSchool}</h2>
@@ -872,11 +872,15 @@ function App() {
           const avatarBgColor = getAvatarColor(pin.full_name);
 
           // Create custom icon with avatar
+          const isSPV = pin.school_name === "Sardar Patel Vidyalaya, Lodi Estate";
+          const isIU = pin.school_name === "Indiana University Bloomington";
+          const displayIconUrl = isSPV ? "/spv-logo.jpg" : (isIU ? "/iu-logo.png" : pin.avatar_url);
+
           const customIcon = L.divIcon({
             className: 'custom-marker',
-            html: pin.avatar_url
+            html: displayIconUrl
               ? `<div class="marker-avatar-container">
-                   <img src="${pin.avatar_url}" class="marker-avatar" alt="${pin.full_name}" />
+                   <img src="${displayIconUrl}" class="marker-avatar ${isSPV || isIU ? 'marker-logo-fit' : ''}" alt="${pin.full_name}" />
                  </div>
                  <div class="marker-name-label">${pin.full_name}</div>`
               : `<div class="marker-avatar-placeholder" style="background-color: ${avatarBgColor}">${pin.full_name.charAt(0)}</div>
@@ -895,22 +899,44 @@ function App() {
               <Popup>
                 <div className="pin-popup">
                   <div className="popup-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                    {pin.avatar_url ? (
-                      <>
-                        {console.log('Avatar URL:', pin.avatar_url)}
-                        <img
-                          src={pin.avatar_url}
-                          alt={pin.full_name}
-                          className="popup-avatar"
-                          style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent)' }}
-                          onError={(e) => {
-                            console.error('Image failed to load:', pin.avatar_url);
-                            e.target.style.display = 'none';
-                          }}
-                        />
-                      </>
+                    {pin.avatar_url && !isSPV && !isIU ? (
+                      <img
+                        src={pin.avatar_url}
+                        alt={pin.full_name}
+                        className="popup-avatar"
+                        style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #fff' }}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                    ) : (isSPV || isIU) ? (
+                      <img
+                        src={isSPV ? "/spv-logo.jpg" : "/iu-logo.png"}
+                        alt="School Logo"
+                        className="popup-avatar"
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          objectFit: 'contain',
+                          background: isIU ? '#990000' : 'white',
+                          border: `2px solid ${isIU ? '#990000' : '#001030'}`,
+                          padding: '2px'
+                        }}
+                      />
                     ) : (
-                      <div className="popup-avatar-placeholder" style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'var(--accent)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                      <div className="popup-avatar-placeholder" style={{
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '50%',
+                        backgroundColor: avatarBgColor,
+                        color: '#001030',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 'bold',
+                        border: '2px solid #001030'
+                      }}>
                         {pin.full_name.charAt(0)}
                       </div>
                     )}
@@ -919,7 +945,7 @@ function App() {
 
                   <div className="tag">
                     <GraduationCap size={14} />
-                    <span><strong>{pin.school_name}</strong> {pin.batch_year && `'${pin.batch_year.slice(-2)}`}</span>
+                    <span><strong>{pin.school_name}</strong> {pin.batch_year && `'${pin.batch_year.toString().slice(-2)}`}</span>
                   </div>
                   <div className="tag">
                     <Briefcase size={14} />
@@ -931,7 +957,19 @@ function App() {
                   </div>
                   {pin.contact_info && (
                     <div className="contact-info">
-                      <Phone size={14} /> {pin.contact_info}
+                      <Phone size={14} />
+                      {pin.contact_info.startsWith('http') || pin.contact_info.includes('linkedin.com') ? (
+                        <a
+                          href={pin.contact_info.startsWith('http') ? pin.contact_info : `https://${pin.contact_info}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: 'inherit', textDecoration: 'underline', wordBreak: 'break-all' }}
+                        >
+                          {pin.contact_info.replace('https://', '').replace('www.', '').split('/')[0] + '...'}
+                        </a>
+                      ) : (
+                        <span>{pin.contact_info}</span>
+                      )}
                     </div>
                   )}
 
