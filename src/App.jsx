@@ -899,7 +899,7 @@ function App() {
               <Popup>
                 <div className="pin-popup">
                   <div className="popup-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                    {pin.avatar_url && !isSPV && !isIU ? (
+                    {pin.avatar_url ? (
                       <img
                         src={pin.avatar_url}
                         alt={pin.full_name}
@@ -909,28 +909,13 @@ function App() {
                           e.target.style.display = 'none';
                         }}
                       />
-                    ) : (isSPV || isIU) ? (
-                      <img
-                        src={isSPV ? "/spv-logo.jpg" : "/iu-logo.png"}
-                        alt="School Logo"
-                        className="popup-avatar"
-                        style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '50%',
-                          objectFit: 'contain',
-                          background: isIU ? '#990000' : 'white',
-                          border: `2px solid ${isIU ? '#990000' : '#001030'}`,
-                          padding: '2px'
-                        }}
-                      />
                     ) : (
                       <div className="popup-avatar-placeholder" style={{
                         width: '40px',
                         height: '40px',
                         borderRadius: '50%',
                         backgroundColor: avatarBgColor,
-                        color: '#001030',
+                        color: '#001030', // Dark Royal Blue
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -957,18 +942,23 @@ function App() {
                   </div>
                   {pin.contact_info && (
                     <div className="contact-info">
-                      <Phone size={14} />
                       {pin.contact_info.startsWith('http') || pin.contact_info.includes('linkedin.com') ? (
-                        <a
-                          href={pin.contact_info.startsWith('http') ? pin.contact_info : `https://${pin.contact_info}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ color: 'inherit', textDecoration: 'underline', wordBreak: 'break-all' }}
-                        >
-                          {pin.contact_info.replace('https://', '').replace('www.', '').split('/')[0] + '...'}
-                        </a>
+                        <>
+                          <Search size={14} style={{ opacity: 0.5 }} />
+                          <a
+                            href={pin.contact_info.startsWith('http') ? pin.contact_info : `https://${pin.contact_info}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: 'inherit', textDecoration: 'underline', wordBreak: 'break-all' }}
+                          >
+                            {pin.contact_info.replace('https://', '').replace('www.', '').split('/')[0] + '...'}
+                          </a>
+                        </>
                       ) : (
-                        <span>{pin.contact_info}</span>
+                        <>
+                          <Phone size={14} />
+                          <span>{pin.contact_info}</span>
+                        </>
                       )}
                     </div>
                   )}
