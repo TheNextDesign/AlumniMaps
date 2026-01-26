@@ -509,7 +509,7 @@ function App() {
               <Search size={20} className="icon" />
               <input
                 type="text"
-                placeholder="Ex. Sardar Patel Vidyalaya, IIT Bombay..."
+                placeholder="Ex. Sardar Patel Vidyalaya, Modern School..."
                 value={schoolInput}
                 onChange={(e) => {
                   setSchoolInput(e.target.value);
