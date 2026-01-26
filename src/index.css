@@ -1506,7 +1506,8 @@ body {
     padding: 30px 20px;
     gap: 20px;
     width: 90%;
-    margin: 10px;
+    margin: 0;
+    max-width: 380px;
   }
 
   .welcome-header h1 {
@@ -1516,11 +1517,18 @@ body {
   .welcome-header p {
     font-size: 0.85rem;
     line-height: 1.4;
+    text-align: center;
   }
 
   .welcome-logo {
     width: 60px;
     height: 60px;
+  }
+
+  .welcome-search-group label,
+  .password-gate label {
+    text-align: center;
+    margin-left: 0;
   }
 
   .school-branding {
