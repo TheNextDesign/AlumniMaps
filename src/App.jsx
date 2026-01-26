@@ -548,18 +548,15 @@ function App() {
         ))}
       </div>
 
-      {/* Top Left Branding / Search Bar */}
+      {/* Top Left Branding */}
       <div className="top-bar">
-        <div className="school-branding glass-panel" onClick={handleSwitchSchool}>
+        <div className="school-branding glass-panel no-click">
           <div className="branding-icon-container">
             <School size={20} />
           </div>
           <div className="branding-text">
             <h2>{selectedSchool}</h2>
             <p>Alumni Connection Map</p>
-          </div>
-          <div className="branding-switch" title="Switch School">
-            <ChevronDown size={16} />
           </div>
         </div>
 
