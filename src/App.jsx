@@ -40,11 +40,18 @@ L.Icon.Default.mergeOptions({
 
 // Custom component to handle map clicks
 function MapEvents({ onMapClick, closeOverlays }) {
-  useMapEvents({
+  const map = useMapEvents({
     click: (e) => {
       onMapClick(e.latlng);
       if (closeOverlays) closeOverlays();
+      map.closePopup();
     },
+    dragstart: () => {
+      map.closePopup();
+    },
+    movestart: () => {
+      map.closePopup();
+    }
   });
   return null;
 }
@@ -899,6 +906,11 @@ function App() {
               key={pin.id}
               position={[parseFloat(pin.latitude), parseFloat(pin.longitude)]}
               icon={customIcon}
+              eventHandlers={{
+                mouseover: (e) => {
+                  e.target.openPopup();
+                },
+              }}
             >
               <Popup>
                 <div className="pin-popup">
