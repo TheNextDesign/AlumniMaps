@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useParams, Routes, Route } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMapEvents, ZoomControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -8,6 +9,26 @@ import indianSchools from './indian_institutes.json'; // Import the list
 import { supabase } from './supabaseClient'; // Import Supabase Client
 import Toast from './Toast'; // New Toast Component
 import { Analytics } from '@vercel/analytics/react';
+
+// URL Helper Functions
+const slugify = (text) => {
+  if (!text) return "";
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')     // Replace spaces with -
+    .replace(/[^\w-]+/g, '')     // Remove all non-word chars
+    .replace(/--+/g, '-');    // Replace multiple - with single -
+};
+
+const findSchoolBySlug = (slug) => {
+  if (!slug) return null;
+  return indianSchools.find(s => {
+    if (s.startsWith('---')) return false; // Skip category headers
+    return slugify(s) === slug;
+  });
+};
 
 // Fix for default Leaflet marker icons in React
 delete L.Icon.Default.prototype._getIconUrl;
@@ -54,9 +75,34 @@ function App() {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  // School Search State
-  const [schoolInput, setSchoolInput] = useState(''); // What the user types
-  const [filterSchool, setFilterSchool] = useState(''); // What is actually searching the map
+  // Routing hooks
+  const { schoolSlug } = useParams();
+  const navigate = useNavigate();
+
+  // School Selection State
+  const [selectedSchool, setSelectedSchool] = useState(null);
+  const [schoolInput, setSchoolInput] = useState(''); // Search within map
+  const [filterSchool, setFilterSchool] = useState('');
+
+  // Sync state with URL
+  useEffect(() => {
+    if (schoolSlug) {
+      const school = findSchoolBySlug(schoolSlug);
+      if (school) {
+        setSelectedSchool(school);
+        setFilterSchool(school);
+        setSchoolInput(school);
+      } else {
+        // Fallback for invalid slugs
+        showToast("School map not found.", "error");
+        navigate('/', { replace: true });
+      }
+    } else {
+      setSelectedSchool(null);
+      setFilterSchool('');
+      setSchoolInput('');
+    }
+  }, [schoolSlug, navigate]);
 
   // Near Me State
   const [nearMeActive, setNearMeActive] = useState(false);
@@ -190,7 +236,11 @@ function App() {
 
   const handleStep1Submit = async (e) => {
     e.preventDefault();
-    if (!formData.school_name || !formData.city) return showToast("Please fill both fields.", "error");
+    if (!formData.city) return showToast("Please enter your city.", "error");
+
+    // Ensure school name is set from selectedSchool
+    const finalFormData = { ...formData, school_name: selectedSchool };
+    setFormData(finalFormData);
 
     // Fly to the city
     try {
@@ -431,6 +481,64 @@ function App() {
     return schoolMatch && cityMatch;
   });
 
+  // Handle School selection on Welcome Screen
+  const handleSelectSchool = (school) => {
+    const slug = slugify(school);
+    navigate(`/${slug}`);
+  };
+
+  // Switch School Helper
+  const handleSwitchSchool = () => {
+    navigate('/');
+    setAddStep(0);
+  };
+
+  if (!selectedSchool) {
+    return (
+      <div className="welcome-screen">
+        <div className="welcome-card glass-panel">
+          <div className="welcome-header">
+            <School size={48} className="welcome-icon" />
+            <h1>Alumni Map</h1>
+            <p>Connect with your fellow alumni across the globe</p>
+          </div>
+
+          <div className="welcome-search-group">
+            <label>Search for your Institution</label>
+            <div className="search-input-group">
+              <Search size={20} className="icon" />
+              <input
+                type="text"
+                placeholder="Ex. Sardar Patel Vidyalaya, IIT Bombay..."
+                value={schoolInput}
+                onChange={(e) => {
+                  setSchoolInput(e.target.value);
+                  setShowSchoolSearchDropdown(true);
+                }}
+                onFocus={() => setShowSchoolSearchDropdown(true)}
+              />
+            </div>
+
+            {showSchoolSearchDropdown && schoolInput && filteredSearchSchools.length > 0 && (
+              <ul className="suggestions-list welcome-suggestions">
+                {filteredSearchSchools.map((school, i) => (
+                  <li key={i} onClick={() => handleSelectSchool(school)}>
+                    <School size={16} className="icon-small" />
+                    {school}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="welcome-footer">
+            <p>Join thousands of alumni already on the map</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app-container">
       {/* Toast Container */}
@@ -440,9 +548,22 @@ function App() {
         ))}
       </div>
 
-      {/* Top Left Search Bar */}
+      {/* Top Left Branding / Search Bar */}
       <div className="top-bar">
-        <div className="search-input-group" style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+        <div className="school-branding glass-panel" onClick={handleSwitchSchool}>
+          <div className="branding-icon-container">
+            <School size={20} />
+          </div>
+          <div className="branding-text">
+            <h2>{selectedSchool}</h2>
+            <p>Alumni Connection Map</p>
+          </div>
+          <div className="branding-switch" title="Switch School">
+            <ChevronDown size={16} />
+          </div>
+        </div>
+
+        <div className="search-input-group" style={{ position: 'relative', display: 'none' }} onClick={e => e.stopPropagation()}>
           <Search size={18} className="icon" />
           <input
             type="text"
@@ -523,6 +644,7 @@ function App() {
               setAddStep(0);
               setNewPinLoc(null);
             } else {
+              setFormData({ ...formData, school_name: selectedSchool, city: '' });
               setAddStep(1);
             }
           }}
@@ -550,37 +672,9 @@ function App() {
               </div>
             </div>
 
-            <form className="add-pin-form" onSubmit={handleStep1Submit} onClick={() => { setShowSchoolDropdown(false); setFormCitySuggestions([]); }}>
-              {/* School Autocomplete */}
-              <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
-                <Search size={14} className="icon-input-overlay" style={{ position: 'absolute', right: 10, top: 12, opacity: 0.5 }} />
-                <input
-                  name="school_name"
-                  placeholder="Search your School/College..."
-                  required
-                  value={formData.school_name}
-                  onChange={(e) => {
-                    handleInputChange(e);
-                    setShowSchoolDropdown(true);
-                    setFormCitySuggestions([]);
-                  }}
-                  onFocus={() => { setShowSchoolDropdown(true); setFormCitySuggestions([]); }}
-                  autoComplete="off"
-                  autoFocus
-                />
-                {showSchoolDropdown && filteredSchoolsList.length > 0 && (
-                  <ul className="suggestions-list" style={{ maxHeight: '150px' }}>
-                    {filteredSchoolsList.map((school, i) => (
-                      <li key={i} onClick={() => {
-                        setFormData({ ...formData, school_name: school });
-                        setShowSchoolDropdown(false);
-                      }}>
-                        <School size={14} className="text-accent" />
-                        {school}
-                      </li>
-                    ))}
-                  </ul>
-                )}
+            <form className="add-pin-form" onSubmit={handleStep1Submit} onClick={() => { setFormCitySuggestions([]); }}>
+              <div style={{ padding: '0 14px 10px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                Adding pin for <strong>{selectedSchool}</strong>
               </div>
 
               {/* City Autocomplete */}
