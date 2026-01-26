@@ -3,7 +3,7 @@ import { useNavigate, useParams, Routes, Route } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMapEvents, ZoomControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { MapPin, Search, GraduationCap, Briefcase, Phone, Menu, X, Plus, School, LocateFixed, ChevronDown, ChevronUp } from 'lucide-react';
+import { MapPin, Search, GraduationCap, Briefcase, Phone, Menu, X, Plus, School, LocateFixed, ChevronDown, ChevronUp, Lock } from 'lucide-react';
 import './index.css';
 import indianSchools from './indian_institutes.json'; // Import the list
 import { supabase } from './supabaseClient'; // Import Supabase Client
@@ -90,6 +90,11 @@ function App() {
   const [selectedSchool, setSelectedSchool] = useState(null);
   const [schoolInput, setSchoolInput] = useState(''); // Search within map
   const [filterSchool, setFilterSchool] = useState('');
+
+  // Auth State for / route
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [password, setPassword] = useState('');
+  const [passwordError, setPasswordError] = useState(false);
 
   // Sync state with URL
   useEffect(() => {
@@ -516,8 +521,22 @@ function App() {
     navigate(`/${slug}`);
   };
 
+  // Handle Password Submit
+  const handlePasswordSubmit = (e) => {
+    e.preventDefault();
+    if (password === 'Alumni@183') {
+      setIsAuthorized(true);
+      setPasswordError(false);
+    } else {
+      setPasswordError(true);
+      showToast("Incorrect password", "error");
+    }
+  };
+
   // Switch School Helper
   const handleSwitchSchool = () => {
+    setIsAuthorized(false);
+    setPassword('');
     navigate('/');
     setAddStep(0);
   };
@@ -532,33 +551,52 @@ function App() {
             <p>Connect with your fellow alumni across the globe</p>
           </div>
 
-          <div className="welcome-search-group">
-            <label>Search for your Institution</label>
-            <div className="search-input-group">
-              <Search size={20} className="icon" />
-              <input
-                type="text"
-                placeholder="Ex. Sardar Patel Vidyalaya, Modern School..."
-                value={schoolInput}
-                onChange={(e) => {
-                  setSchoolInput(e.target.value);
-                  setShowSchoolSearchDropdown(true);
-                }}
-                onFocus={() => setShowSchoolSearchDropdown(true)}
-              />
-            </div>
+          {!isAuthorized ? (
+            <form className="password-gate" onSubmit={handlePasswordSubmit}>
+              <label>Enter Portal Password</label>
+              <div className="search-input-group">
+                <Lock size={20} className="icon" />
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <button type="submit" className="btn-submit" style={{ marginTop: '20px', width: '100%' }}>
+                Access Portal
+              </button>
+            </form>
+          ) : (
+            <div className="welcome-search-group">
+              <label>Search for your Institution</label>
+              <div className="search-input-group">
+                <Search size={20} className="icon" />
+                <input
+                  type="text"
+                  placeholder="Ex. Sardar Patel Vidyalaya, Modern School..."
+                  value={schoolInput}
+                  onChange={(e) => {
+                    setSchoolInput(e.target.value);
+                    setShowSchoolSearchDropdown(true);
+                  }}
+                  onFocus={() => setShowSchoolSearchDropdown(true)}
+                />
+              </div>
 
-            {showSchoolSearchDropdown && schoolInput && filteredSearchSchools.length > 0 && (
-              <ul className="suggestions-list welcome-suggestions">
-                {filteredSearchSchools.map((school, i) => (
-                  <li key={i} onClick={() => handleSelectSchool(school)}>
-                    <School size={16} className="icon-small" />
-                    {school}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+              {showSchoolSearchDropdown && schoolInput && filteredSearchSchools.length > 0 && (
+                <ul className="suggestions-list welcome-suggestions">
+                  {filteredSearchSchools.map((school, i) => (
+                    <li key={i} onClick={() => handleSelectSchool(school)}>
+                      <School size={16} className="icon-small" />
+                      {school}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           <div className="welcome-footer">
             <p>Ready to reconnect? LetsCatchUp!</p>
