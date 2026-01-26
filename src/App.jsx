@@ -517,7 +517,7 @@ function App() {
         <div className="welcome-card glass-panel">
           <div className="welcome-header">
             <School size={48} className="welcome-icon" />
-            <h1>Alumni Map</h1>
+            <h1>LetsCatchUp</h1>
             <p>Connect with your fellow alumni across the globe</p>
           </div>
 
@@ -550,7 +550,7 @@ function App() {
           </div>
 
           <div className="welcome-footer">
-            <p>Join thousands of alumni already on the map</p>
+            <p>Ready to reconnect? LetsCatchUp!</p>
           </div>
         </div>
       </div>
@@ -574,7 +574,7 @@ function App() {
           </div>
           <div className="branding-text">
             <h2>{selectedSchool}</h2>
-            <p>Alumni Connection Map</p>
+            <p>LetsCatchUp Map</p>
           </div>
         </div>
 
