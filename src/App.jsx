@@ -104,6 +104,10 @@ function App() {
     }
   }, [schoolSlug, navigate]);
 
+  const isSPV = selectedSchool === "Sardar Patel Vidyalaya, Lodi Estate";
+  const isIU = selectedSchool === "Indiana University Bloomington";
+  const schoolLogo = isSPV ? "/spv-logo.jpg" : (isIU ? "/iu-logo.png" : "/letscatchup-logo.jpg");
+
   // Near Me State
   const [nearMeActive, setNearMeActive] = useState(false);
   const [userLocation, setUserLocation] = useState(null);
@@ -570,11 +574,11 @@ function App() {
       <div className="top-bar">
         <div className="school-branding glass-panel no-click">
           <div className="branding-icon-container">
-            <img src="/letscatchup-logo.jpg" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
+            <img src={schoolLogo} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
           </div>
           <div className="branding-text">
             <h2>{selectedSchool}</h2>
-            <p>LetsCatchUp Map</p>
+            <p>{selectedSchool} Family</p>
           </div>
         </div>
 
@@ -872,15 +876,15 @@ function App() {
           const avatarBgColor = getAvatarColor(pin.full_name);
 
           // Create custom icon with avatar
-          const isSPV = pin.school_name === "Sardar Patel Vidyalaya, Lodi Estate";
-          const isIU = pin.school_name === "Indiana University Bloomington";
-          const displayIconUrl = isSPV ? "/spv-logo.jpg" : (isIU ? "/iu-logo.png" : pin.avatar_url);
+          const pinIsSPV = pin.school_name === "Sardar Patel Vidyalaya, Lodi Estate";
+          const pinIsIU = pin.school_name === "Indiana University Bloomington";
+          const displayIconUrl = pinIsSPV ? "/spv-logo.jpg" : (pinIsIU ? "/iu-logo.png" : pin.avatar_url);
 
           const customIcon = L.divIcon({
             className: 'custom-marker',
             html: displayIconUrl
               ? `<div class="marker-avatar-container">
-                   <img src="${displayIconUrl}" class="marker-avatar ${isSPV || isIU ? 'marker-logo-fit' : ''}" alt="${pin.full_name}" />
+                   <img src="${displayIconUrl}" class="marker-avatar ${pinIsSPV || pinIsIU ? 'marker-logo-fit' : ''}" alt="${pin.full_name}" />
                  </div>
                  <div class="marker-name-label">${pin.full_name}</div>`
               : `<div class="marker-avatar-placeholder" style="background-color: ${avatarBgColor}">${pin.full_name.charAt(0)}</div>
@@ -907,6 +911,21 @@ function App() {
                         style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #fff' }}
                         onError={(e) => {
                           e.target.style.display = 'none';
+                        }}
+                      />
+                    ) : (pinIsSPV || pinIsIU) ? (
+                      <img
+                        src={pinIsSPV ? "/spv-logo.jpg" : "/iu-logo.png"}
+                        alt="School Logo"
+                        className="popup-avatar"
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          objectFit: 'contain',
+                          background: pinIsIU ? '#990000' : 'white',
+                          border: `2px solid ${pinIsIU ? '#990000' : '#001030'}`,
+                          padding: '2px'
                         }}
                       />
                     ) : (
