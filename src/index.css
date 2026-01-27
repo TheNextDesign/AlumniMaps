@@ -648,28 +648,32 @@ body {
 }
 
 .popup-social-links a {
-  color: var(--text-muted);
+  color: white;
+  /* Default fallback */
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
+  opacity: 0.9;
 }
 
 .popup-social-links a:hover {
-  color: white;
   transform: translateY(-2px);
+  opacity: 1;
 }
 
-.popup-social-links a[title="LinkedIn"]:hover {
-  color: #0077b5;
+/* Brand Colors - Always Visible */
+.popup-social-links a[title="LinkedIn"] {
+  color: #0077b5 !important;
 }
 
-.popup-social-links a[title="Instagram"]:hover {
-  color: #e1306c;
+.popup-social-links a[title="Instagram"] {
+  color: #E1306C !important;
 }
 
-.popup-social-links a[title="X (Twitter)"]:hover {
-  color: white;
+.popup-social-links a[title="X (Twitter)"] {
+  color: #ffffff !important;
+  /* White for X on dark bg */
 }
 
 /* Leaflet Map Specifics */
