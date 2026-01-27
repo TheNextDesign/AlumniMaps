@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, Routes, Route } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMapEvents, ZoomControl } from 'react-leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { MapPin, Search, GraduationCap, Briefcase, Phone, Menu, X, Plus, School, LocateFixed, ChevronDown, ChevronUp, Lock, Linkedin, Instagram, Twitter } from 'lucide-react';
@@ -38,8 +39,17 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
+// Custom cluster icon
+const createClusterCustomIcon = function (cluster) {
+  return L.divIcon({
+    html: `<span>${cluster.getChildCount()}</span>`,
+    className: 'custom-cluster-icon',
+    iconSize: L.point(40, 40, true),
+  });
+};
+
 // Custom component to handle map clicks
-function MapEvents({ onMapClick, closeOverlays }) {
+function MapEvents({ onMapClick, closeOverlays, setZoom }) {
   const map = useMapEvents({
     click: (e) => {
       onMapClick(e.latlng);
@@ -51,6 +61,9 @@ function MapEvents({ onMapClick, closeOverlays }) {
     },
     movestart: () => {
       map.closePopup();
+    },
+    zoomend: () => {
+      setZoom(map.getZoom());
     }
   });
   return null;
@@ -100,6 +113,8 @@ function MapController({ center }) {
 function App() {
   const [pins, setPins] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [zoomLevel, setZoomLevel] = useState(5); // Track map zoom
+
 
   // Toast State
   const [toasts, setToasts] = useState([]);
@@ -179,7 +194,8 @@ function App() {
     mobile_number: '',
     linkedin_url: '',
     instagram_url: '',
-    twitter_url: ''
+    twitter_url: '',
+    pincode: ''
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -399,7 +415,7 @@ function App() {
         setAvatarFile(null);
         setAvatarPreview(null);
         setFormData({
-          full_name: '', school_name: '', batch_year: '', profession: '', company: '', city: '', contact_info: '', mobile_number: '', linkedin_url: '', instagram_url: '', twitter_url: ''
+          full_name: '', school_name: '', batch_year: '', profession: '', company: '', city: '', contact_info: '', mobile_number: '', linkedin_url: '', instagram_url: '', twitter_url: '', pincode: ''
         });
         showToast("Pin added successfully!", "success");
       }
@@ -796,16 +812,13 @@ function App() {
             </div>
 
             <form className="add-pin-form" onSubmit={handleStep1Submit} onClick={() => { setFormCitySuggestions([]); }}>
-              <div style={{ padding: '0 14px 10px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                Adding pin for <strong>{selectedSchool}</strong>
-              </div>
 
-              {/* City Autocomplete */}
+              {/* City Input */}
               <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
                 <MapPin size={14} className="icon-input-overlay" style={{ position: 'absolute', right: 10, top: 12, opacity: 0.5 }} />
                 <input
                   name="city"
-                  placeholder="Current City/Pincode"
+                  placeholder="City"
                   required
                   value={formData.city}
                   onChange={(e) => {
@@ -828,6 +841,23 @@ function App() {
                     ))}
                   </ul>
                 )}
+              </div>
+
+              {/* Pincode Input */}
+              <div style={{ marginTop: '5px' }}>
+                <input
+                  name="pincode"
+                  placeholder="Pincode"
+                  required
+                  value={formData.pincode || ''}
+                  onChange={(e) => {
+                    // Only numbers for pincode
+                    const val = e.target.value.replace(/\D/g, '');
+                    setFormData({ ...formData, pincode: val });
+                  }}
+                  pattern="\d*"
+                  maxLength={10}
+                />
               </div>
 
               <button type="submit" className="btn-submit">
@@ -961,7 +991,10 @@ function App() {
       <MapContainer
         center={[20.5937, 78.9629]}
         zoom={5}
-        minZoom={3} // Prevent zooming out too far
+        minZoom={2}
+        worldCopyJump={true}
+        maxBounds={[[-85, -Infinity], [85, Infinity]]}
+        maxBoundsViscosity={1.0}
         style={{ height: "100vh", width: "100%" }}
         zoomControl={false} // Custom zoom control position if needed, or default
         attributionControl={false}
@@ -983,227 +1016,263 @@ function App() {
             setShowSchoolDropdown(false);
             setFormCitySuggestions([]);
           }}
+          setZoom={setZoomLevel}
         />
 
-        {/* Render Existing Pins */}
-        {filteredPins.map(pin => {
-          // Generate consistent color based on name
-          const getAvatarColor = (name) => {
-            const colors = [
-              '#FFCB42', '#FF6B6B', '#4ECDC4', '#45B7D1',
-              '#FFA07A', '#98D8C8', '#BB8FCE', '#85C1E2',
-              '#F8B739', '#52B788'
-            ];
-            const charCode = name.charCodeAt(0) || 0;
-            return colors[charCode % colors.length];
-          };
-          const avatarBgColor = getAvatarColor(pin.full_name);
+        {/* Render Existing Pins with Clustering */}
+        <MarkerClusterGroup
+          chunkedLoading
+          iconCreateFunction={createClusterCustomIcon}
+          maxClusterRadius={50} // Cluster nearby pins
+          spiderfyOnMaxZoom={true}
+        >
+          {filteredPins.map(pin => {
+            // Generate consistent color based on name
+            const getAvatarColor = (name) => {
+              const colors = [
+                '#FFCB42', '#FF6B6B', '#4ECDC4', '#45B7D1',
+                '#FFA07A', '#98D8C8', '#BB8FCE', '#85C1E2',
+                '#F8B739', '#52B788'
+              ];
+              const charCode = name.charCodeAt(0) || 0;
+              return colors[charCode % colors.length];
+            };
+            const avatarBgColor = getAvatarColor(pin.full_name);
 
-          // Create custom icon with avatar
-          const pinIsSPV = pin.school_name === "Sardar Patel Vidyalaya, Lodi Estate";
-          const pinIsIU = pin.school_name === "Indiana University Bloomington";
-          const displayIconUrl = pinIsSPV ? "/spv-logo.jpg" : (pinIsIU ? "/iu-logo.png" : pin.avatar_url);
+            // Create custom icon with avatar
+            const pinIsSPV = pin.school_name === "Sardar Patel Vidyalaya, Lodi Estate";
+            const pinIsIU = pin.school_name === "Indiana University Bloomington";
+            const displayIconUrl = pinIsSPV ? "/spv-logo.jpg" : (pinIsIU ? "/iu-logo.png" : pin.avatar_url);
 
-          const customIcon = L.divIcon({
-            className: 'custom-marker',
-            html: displayIconUrl
-              ? `<div class="marker-avatar-container">
-                   <img src="${displayIconUrl}" class="marker-avatar ${pinIsSPV || pinIsIU ? 'marker-logo-fit' : ''}" alt="${pin.full_name}" />
-                 </div>
-                 <div class="marker-name-label">${pin.full_name}</div>`
-              : `<div class="marker-avatar-placeholder" style="background-color: ${avatarBgColor}">${pin.full_name.charAt(0)}</div>
-                 <div class="marker-name-label">${pin.full_name}</div>`,
-            iconSize: [50, 80],
-            iconAnchor: [25, 60],
-            popupAnchor: [0, -60]
-          });
+            // Only show name label if zoom level > 7 (City level)
+            const showNameLabel = zoomLevel > 7;
 
-          return (
+            const customIcon = L.divIcon({
+              className: `custom-marker ${showNameLabel ? 'interactive-marker' : ''}`,
+              html: displayIconUrl
+                ? `<div class="marker-avatar-container">
+                     <img src="${displayIconUrl}" class="marker-avatar ${pinIsSPV || pinIsIU ? 'marker-logo-fit' : ''}" alt="${pin.full_name}" />
+                   </div>
+                   ${showNameLabel ? `<div class="marker-name-label">
+                     ${pin.full_name}
+                     ${pin.batch_year ? `<div style="font-size:0.65em; font-weight:400; opacity:0.9; margin-top:1px;">Batch of ${pin.batch_year}</div>` : ''}
+                   </div>` : ''}`
+                : `<div class="marker-avatar-placeholder" style="--pin-color: ${avatarBgColor}; background-color: ${avatarBgColor}">${pin.full_name.charAt(0)}</div>
+                   ${showNameLabel ? `<div class="marker-name-label">
+                     ${pin.full_name}
+                     ${pin.batch_year ? `<div style="font-size:0.65em; font-weight:400; opacity:0.9; margin-top:1px;">Batch of ${pin.batch_year}</div>` : ''}
+                   </div>` : ''}`,
+              iconSize: [40, 70], // Reduced size in config too
+              iconAnchor: [20, 55],
+              popupAnchor: [0, -60]
+            });
+
+            return (
+              <Marker
+                key={pin.id}
+                position={[parseFloat(pin.latitude), parseFloat(pin.longitude)]}
+                icon={customIcon}
+                eventHandlers={{
+                  mouseover: (e) => {
+                    e.target.openPopup();
+                  },
+                }}
+              >
+                <Popup>
+                  <div className="pin-popup">
+                    {showNameLabel ? (
+                      <>
+                        <div className="popup-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                          {pin.avatar_url ? (
+                            <img
+                              src={pin.avatar_url}
+                              alt={pin.full_name}
+                              className="popup-avatar"
+                              style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #fff' }}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <div className="popup-avatar-placeholder" style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '50%',
+                              backgroundColor: avatarBgColor,
+                              color: '#001030', // Dark Royal Blue
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 'bold',
+                              border: '2px solid #001030'
+                            }}>
+                              {pin.full_name.charAt(0)}
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <h3 style={{ margin: 0 }}>@{pin.full_name}</h3>
+                            {pin.batch_year && (
+                              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                                Batch of {pin.batch_year}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: '5px' }}>
+                        <strong style={{ fontSize: '1rem', color: '#fff' }}>1 Alumni Found</strong>
+                        <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)' }}>
+                          Zoom in to see details
+                        </p>
+                      </div>
+                    )}
+
+                    {showNameLabel && (
+                      <>
+                        <div className="tag">
+                          <GraduationCap size={14} />
+                          <span><strong>{pin.school_name}</strong></span>
+                        </div>
+                        <div className="tag">
+                          <Briefcase size={14} />
+                          <span>{pin.profession} {pin.company && `@ ${pin.company}`}</span>
+                        </div>
+                        <div className="tag">
+                          <MapPin size={14} />
+                          <CityResolver city={pin.city} lat={pin.latitude} lon={pin.longitude} />
+                        </div>
+                        {pin.contact_info && (
+                          <div className="contact-info">
+                            <Phone size={14} />
+                            <span>{pin.contact_info}</span>
+                          </div>
+                        )}
+
+                        {/* Social Media Links in Popup */}
+                        {(pin.linkedin_url || pin.instagram_url || pin.twitter_url) && (
+                          <div className="popup-social-links">
+                            {pin.linkedin_url && (
+                              <a href={pin.linkedin_url.startsWith('http') ? pin.linkedin_url : `https://${pin.linkedin_url}`} target="_blank" rel="noopener noreferrer" title="LinkedIn">
+                                <Linkedin size={18} />
+                              </a>
+                            )}
+                            {pin.instagram_url && (
+                              <a href={pin.instagram_url.startsWith('http') ? pin.instagram_url : `https://instagram.com/${pin.instagram_url.replace('@', '')}`} target="_blank" rel="noopener noreferrer" title="Instagram">
+                                <Instagram size={18} />
+                              </a>
+                            )}
+                            {pin.twitter_url && (
+                              <a href={pin.twitter_url.startsWith('http') ? pin.twitter_url : `https://${pin.twitter_url}`} target="_blank" rel="noopener noreferrer" title="X (Twitter)">
+                                <Twitter size={18} />
+                              </a>
+                            )}
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginTop: '10px' }}>
+                          {/* Directions Button (Left) */}
+                          <a
+                            href={`https://www.google.com/maps/dir/?api=1&destination=${pin.latitude},${pin.longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="directions-btn"
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              backgroundColor: '#3b82f6', // Blue
+                              color: 'white',
+                              padding: '6px 10px',
+                              borderRadius: '15px',
+                              textDecoration: 'none',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                            }}
+                          >
+                            <MapPin size={12} />
+                            Directions
+                          </a>
+
+                          {/* WhatsApp Button (Right) */}
+                          {pin.mobile_number && (
+                            <a
+                              href={`https://wa.me/${pin.mobile_number.replace(/\D/g, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="whatsapp-btn"
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                backgroundColor: '#25D366',
+                                color: 'white',
+                                padding: '6px 12px',
+                                borderRadius: '20px',
+                                textDecoration: 'none',
+                                fontSize: '0.85rem',
+                                fontWeight: '600',
+                                boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                              }}
+                            >
+                              <svg
+                                viewBox="0 0 24 24"
+                                width="18"
+                                height="18"
+                                fill="currentColor"
+                              >
+                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                              </svg>
+                              Chat
+                            </a>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
+        </MarkerClusterGroup>
+
+        {/* Temporary Marker for New Pin - Draggable */}
+        {
+          newPinLoc && (
             <Marker
-              key={pin.id}
-              position={[parseFloat(pin.latitude), parseFloat(pin.longitude)]}
-              icon={customIcon}
+              position={newPinLoc}
+              opacity={0.8}
+              draggable={true}
               eventHandlers={{
-                mouseover: (e) => {
-                  e.target.openPopup();
-                },
+                dragend: (e) => {
+                  const marker = e.target;
+                  const position = marker.getLatLng();
+                  setNewPinLoc([position.lat, position.lng]);
+                }
               }}
             >
               <Popup>
-                <div className="pin-popup">
-                  <div className="popup-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                    {pin.avatar_url ? (
-                      <img
-                        src={pin.avatar_url}
-                        alt={pin.full_name}
-                        className="popup-avatar"
-                        style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #fff' }}
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      <div className="popup-avatar-placeholder" style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '50%',
-                        backgroundColor: avatarBgColor,
-                        color: '#001030', // Dark Royal Blue
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 'bold',
-                        border: '2px solid #001030'
-                      }}>
-                        {pin.full_name.charAt(0)}
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <h3 style={{ margin: 0 }}>@{pin.full_name}</h3>
-                      {pin.batch_year && (
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                          Batch of {pin.batch_year}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="tag">
-                    <GraduationCap size={14} />
-                    <span><strong>{pin.school_name}</strong></span>
-                  </div>
-                  <div className="tag">
-                    <Briefcase size={14} />
-                    <span>{pin.profession} {pin.company && `@ ${pin.company}`}</span>
-                  </div>
-                  <div className="tag">
-                    <MapPin size={14} />
-                    <CityResolver city={pin.city} lat={pin.latitude} lon={pin.longitude} />
-                  </div>
-                  {pin.contact_info && (
-                    <div className="contact-info">
-                      <Phone size={14} />
-                      <span>{pin.contact_info}</span>
-                    </div>
-                  )}
-
-                  {/* Social Media Links in Popup */}
-                  {(pin.linkedin_url || pin.instagram_url || pin.twitter_url) && (
-                    <div className="popup-social-links">
-                      {pin.linkedin_url && (
-                        <a href={pin.linkedin_url.startsWith('http') ? pin.linkedin_url : `https://${pin.linkedin_url}`} target="_blank" rel="noopener noreferrer" title="LinkedIn">
-                          <Linkedin size={18} />
-                        </a>
-                      )}
-                      {pin.instagram_url && (
-                        <a href={pin.instagram_url.startsWith('http') ? pin.instagram_url : `https://instagram.com/${pin.instagram_url.replace('@', '')}`} target="_blank" rel="noopener noreferrer" title="Instagram">
-                          <Instagram size={18} />
-                        </a>
-                      )}
-                      {pin.twitter_url && (
-                        <a href={pin.twitter_url.startsWith('http') ? pin.twitter_url : `https://${pin.twitter_url}`} target="_blank" rel="noopener noreferrer" title="X (Twitter)">
-                          <Twitter size={18} />
-                        </a>
-                      )}
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginTop: '10px' }}>
-                    {/* Directions Button (Left) */}
-                    <a
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${pin.latitude},${pin.longitude}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="directions-btn"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        backgroundColor: '#3b82f6', // Blue
-                        color: 'white',
-                        padding: '6px 10px',
-                        borderRadius: '15px',
-                        textDecoration: 'none',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-                      }}
-                    >
-                      <MapPin size={12} />
-                      Directions
-                    </a>
-
-                    {/* WhatsApp Button (Right) */}
-                    {pin.mobile_number && (
-                      <a
-                        href={`https://wa.me/${pin.mobile_number.replace(/\D/g, '')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="whatsapp-btn"
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          backgroundColor: '#25D366',
-                          color: 'white',
-                          padding: '6px 12px',
-                          borderRadius: '20px',
-                          textDecoration: 'none',
-                          fontSize: '0.85rem',
-                          fontWeight: '600',
-                          boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-                        }}
-                      >
-                        <svg
-                          viewBox="0 0 24 24"
-                          width="18"
-                          height="18"
-                          fill="currentColor"
-                        >
-                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-                        </svg>
-                        Chat
-                      </a>
-                    )}
-                  </div>
+                <div style={{ textAlign: 'center' }}>
+                  <strong>New Pin Location</strong>
+                  <p style={{ margin: '5px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                    Drag to adjust position
+                  </p>
                 </div>
               </Popup>
             </Marker>
-          );
-        })}
-
-        {/* Temporary Marker for New Pin - Draggable */}
-        {newPinLoc && (
-          <Marker
-            position={newPinLoc}
-            opacity={0.8}
-            draggable={true}
-            eventHandlers={{
-              dragend: (e) => {
-                const marker = e.target;
-                const position = marker.getLatLng();
-                setNewPinLoc([position.lat, position.lng]);
-              }
-            }}
-          >
-            <Popup>
-              <div style={{ textAlign: 'center' }}>
-                <strong>New Pin Location</strong>
-                <p style={{ margin: '5px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  Drag to adjust position
-                </p>
-              </div>
-            </Popup>
-          </Marker>
-        )}
-      </MapContainer>
+          )
+        }
+      </MapContainer >
 
       {/* Stats Pill - Only show when searching */}
-      {filterSchool.trim() && (
-        <div className="stats-pill">
-          {`Found ${filteredPins.length} Alumni`}
-        </div>
-      )}
+      {
+        filterSchool.trim() && (
+          <div className="stats-pill">
+            {`Found ${filteredPins.length} Alumni`}
+          </div>
+        )
+      }
       <Analytics />
 
       {/* Credits */}
@@ -1213,7 +1282,7 @@ function App() {
         <p style={{ fontWeight: 600, margin: '2px 0' }}>Sardar Patel Vidyalaya, Lodi Estate</p>
         <p>Batch of 1995</p>
       </div>
-    </div>
+    </div >
   );
 }
 

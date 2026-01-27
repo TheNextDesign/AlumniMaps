@@ -383,6 +383,7 @@ body {
 }
 
 /* Stats Pill - Move to Bottom Left to balance */
+/* Stats Pill - Move to Bottom Left to balance */
 .stats-pill {
   position: absolute;
   bottom: 40px;
@@ -398,6 +399,9 @@ body {
   border: 1px solid var(--border);
   z-index: 1000;
   box-shadow: var(--shadow-lg);
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
 }
 
 /* Pin Mode Instruction */
@@ -1662,10 +1666,148 @@ body {
 }
 
 /* Mobile Responsive Adjustments */
+/* Mobile Responsive Adjustments */
 @media (max-width: 700px) {
-  .credits-corner {
-    bottom: 5px;
-    right: 5px;
-    font-size: 0.6rem;
-  }
+  /* Any specific mobile tweaks can go here if needed, currently empty for markers as they are global */
+}
+
+/* GLOBAL MARKER STYLES */
+/* Custom Map Marker */
+.custom-marker {
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  width: 40px !important;
+  height: 70px !important;
+}
+
+/* Pin Head (Avatar Container) */
+/* Pin Head (Avatar Container) */
+/* Pin Head (Avatar Container) */
+/* Pin Head (Avatar Container) */
+.marker-avatar-container,
+.marker-avatar-placeholder {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  border: 3px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background-color: #B7410E;
+  z-index: 2;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.marker-avatar-container {
+  background-color: #B7410E !important;
+}
+
+/* User's Image */
+.marker-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+/* Pointer Triangle - Sharper & Larger */
+.marker-avatar-container::after,
+.marker-avatar-placeholder::after {
+  content: '';
+  position: absolute;
+  bottom: -18px;
+  /* Pull down further */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 13px solid transparent;
+  border-right: 13px solid transparent;
+  border-top: 22px solid #B7410E;
+  /* Even larger arrow */
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.2));
+  z-index: -1;
+}
+
+.marker-avatar-placeholder::after {
+  border-top-color: var(--pin-color, #B7410E);
+}
+
+/* Letter Placeholder */
+.marker-avatar-placeholder {
+  color: #001030;
+  font-weight: 700;
+  font-size: 1.1rem;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.marker-avatar-placeholder>div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+/* Pin Animation on Hover - Simple Upward Float */
+.custom-marker.interactive-marker:hover .marker-avatar-container,
+.custom-marker.interactive-marker:hover .marker-avatar-placeholder {
+  transform: scale(1.15) translateY(-5px);
+  z-index: 10;
+  border-color: #fff;
+  /* Keep white border, maybe glow? */
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+/* Name Bubble - Styled like a black tag to the right */
+.marker-name-label {
+  position: absolute;
+  top: 10px;
+  /* Center with pin head (44px height -> center ~22px, label height ~24px -> top ~10px) */
+  left: 48px;
+  /* 44px width + 4px gap */
+  background: #000;
+  /* Pure Black */
+  color: white;
+  padding: 4px 10px;
+  border-radius: 6px;
+  /* Rounded corners like screenshot */
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  z-index: 1;
+  pointer-events: none;
+  /* NO transparency, NO border */
+}
+
+
+/* Cluster Icon Styling */
+.custom-cluster-icon {
+  background: rgba(183, 65, 14, 0.95);
+  /* Rust Orange #B7410E */
+  color: white;
+  border: 4px solid rgba(255, 255, 255, 0.4);
+  background-clip: padding-box;
+  border-radius: 50%;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s ease;
+}
+
+.custom-cluster-icon:hover {
+  transform: scale(1.1);
+  background: #B7410E;
+  border-color: rgba(255, 255, 255, 0.8);
+  z-index: 1000 !important;
 }
