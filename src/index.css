@@ -599,6 +599,79 @@ body {
   font-weight: 500;
 }
 
+/* Social Media Form Section */
+.social-form-section {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid var(--border);
+}
+
+.section-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.social-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.social-icon-input {
+  position: absolute;
+  left: 12px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.social-input-group input {
+  padding-left: 40px !important;
+}
+
+/* Popup Social Links */
+.popup-social-links {
+  display: flex;
+  gap: 15px;
+  margin-top: 15px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.popup-social-links a {
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.popup-social-links a:hover {
+  color: white;
+  transform: translateY(-2px);
+}
+
+.popup-social-links a[title="LinkedIn"]:hover {
+  color: #0077b5;
+}
+
+.popup-social-links a[title="Instagram"]:hover {
+  color: #e1306c;
+}
+
+.popup-social-links a[title="X (Twitter)"]:hover {
+  color: white;
+}
+
 /* Leaflet Map Specifics */
 .leaflet-container {
   background: #111;
@@ -1545,5 +1618,50 @@ body {
 
   .branding-text p {
     display: none;
+  }
+}
+
+/* Credits Corner */
+.credits-corner {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  text-align: right;
+  z-index: 999;
+  /* Below modal/sidebar but above map */
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 0.75rem;
+  pointer-events: none;
+  line-height: 1.2;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+.credits-corner p {
+  margin: 0;
+}
+
+.credits-corner strong {
+  color: rgba(0, 0, 0, 0.9);
+  font-weight: 700;
+  display: block;
+}
+
+/* Hide Leaflet Attribution */
+.leaflet-control-attribution {
+  display: none !important;
+}
+
+/* Adjust stats pill to not overlap credits */
+.stats-pill {
+  bottom: 80px;
+  /* Moved up to make room for credits */
+}
+
+/* Mobile Responsive Adjustments */
+@media (max-width: 700px) {
+  .credits-corner {
+    bottom: 5px;
+    right: 5px;
+    font-size: 0.6rem;
   }
 }

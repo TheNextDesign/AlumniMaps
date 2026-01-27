@@ -3,7 +3,7 @@ import { useNavigate, useParams, Routes, Route } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMapEvents, ZoomControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { MapPin, Search, GraduationCap, Briefcase, Phone, Menu, X, Plus, School, LocateFixed, ChevronDown, ChevronUp, Lock } from 'lucide-react';
+import { MapPin, Search, GraduationCap, Briefcase, Phone, Menu, X, Plus, School, LocateFixed, ChevronDown, ChevronUp, Lock, Linkedin, Instagram, Twitter } from 'lucide-react';
 import './index.css';
 import indianSchools from './indian_institutes.json'; // Import the list
 import { supabase } from './supabaseClient'; // Import Supabase Client
@@ -54,6 +54,36 @@ function MapEvents({ onMapClick, closeOverlays }) {
     }
   });
   return null;
+}
+
+// Component to resolve City Name if only Pincode is present
+function CityResolver({ city, lat, lon }) {
+  const [displayCity, setDisplayCity] = useState(city);
+
+  useEffect(() => {
+    // Check if city is just a 4-6 digit number (Pincode)
+    if (/^\d{4,6}$/.test(city)) {
+      const fetchCity = async () => {
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10&accept-language=en`);
+          const data = await res.json();
+          if (data && data.address) {
+            const cityName = data.address.city || data.address.town || data.address.village || data.address.county || data.address.state_district;
+            if (cityName) {
+              setDisplayCity(`${cityName} ${city}`); // Show City + Pincode
+            }
+          }
+        } catch (err) {
+          console.error("Failed to reverse geocode", err);
+        }
+      };
+      fetchCity();
+    } else {
+      setDisplayCity(city);
+    }
+  }, [city, lat, lon]);
+
+  return <span>{displayCity}</span>;
 }
 
 // Component to handle map movements
@@ -146,7 +176,10 @@ function App() {
     company: '',
     city: '',
     contact_info: '',
-    mobile_number: ''
+    mobile_number: '',
+    linkedin_url: '',
+    instagram_url: '',
+    twitter_url: ''
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -248,7 +281,14 @@ function App() {
   };
 
   const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    let { name, value } = e.target;
+
+    // Enforce numbers only for mobile_number
+    if (name === 'mobile_number') {
+      value = value.replace(/\D/g, '');
+    }
+
+    setFormData({ ...formData, [name]: value });
   };
 
   const handleStep1Submit = async (e) => {
@@ -257,22 +297,41 @@ function App() {
 
     // Ensure school name is set from selectedSchool
     const finalFormData = { ...formData, school_name: selectedSchool };
-    setFormData(finalFormData);
 
     // Fly to the city
     try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(formData.city)}&accept-language=en&limit=1`);
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(formData.city)}&addressdetails=1&accept-language=en&limit=1`);
       const data = await response.json();
       if (data && data.length > 0) {
-        const { lat, lon } = data[0];
+        const { lat, lon, address, display_name } = data[0];
         setFlyToLocation([parseFloat(lat), parseFloat(lon)]);
+
+        // Auto-update city name if we got better details (especially for pincodes)
+        // Try to construct "City, State" or fallback to display_name
+        let niceCityName = formData.city;
+        if (address) {
+          const cityComponent = address.city || address.town || address.village || address.county || address.state_district;
+          const stateComponent = address.state;
+          const postcode = address.postcode;
+
+          if (cityComponent && stateComponent) {
+            niceCityName = `${cityComponent}, ${stateComponent}${postcode ? ' ' + postcode : ''}`;
+          } else {
+            // Fallback to shorter display name (first 2 parts)
+            niceCityName = display_name.split(',').slice(0, 2).join(',');
+          }
+        }
+
+        setFormData({ ...finalFormData, city: niceCityName });
         setAddStep(2); // Move to Pick Location
       } else {
         showToast("City not found. Try a major city.", "error");
+        setFormData(finalFormData);
       }
     } catch (err) {
       console.error(err);
-      // Even if fly fails, let them proceed? Maybe warn.
+      // Even if fly fails, let them proceed
+      setFormData(finalFormData);
       setAddStep(2);
     }
   };
@@ -340,7 +399,7 @@ function App() {
         setAvatarFile(null);
         setAvatarPreview(null);
         setFormData({
-          full_name: '', school_name: '', batch_year: '', profession: '', company: '', city: '', contact_info: '', mobile_number: ''
+          full_name: '', school_name: '', batch_year: '', profession: '', company: '', city: '', contact_info: '', mobile_number: '', linkedin_url: '', instagram_url: '', twitter_url: ''
         });
         showToast("Pin added successfully!", "success");
       }
@@ -866,7 +925,26 @@ function App() {
                   )}
                 </div>
 
-                <input name="contact_info" placeholder="Email/LinkedIn (Optional)" onChange={handleInputChange} />
+                <input name="contact_info" placeholder="Email (Optional)" onChange={handleInputChange} />
+
+                {/* Social Media Section */}
+                <div className="social-form-section">
+                  <p className="section-label">Social Media (Optional)</p>
+                  <div className="social-input-group">
+                    <div className="input-with-icon">
+                      <Linkedin size={18} className="social-icon-input" />
+                      <input name="linkedin_url" placeholder="LinkedIn Profile URL" onChange={handleInputChange} />
+                    </div>
+                    <div className="input-with-icon">
+                      <Instagram size={18} className="social-icon-input" />
+                      <input name="instagram_url" placeholder="Instagram Username" onChange={handleInputChange} />
+                    </div>
+                    <div className="input-with-icon">
+                      <Twitter size={18} className="social-icon-input" />
+                      <input name="twitter_url" placeholder="X (Twitter) Profile URL" onChange={handleInputChange} />
+                    </div>
+                  </div>
+                </div>
 
                 <div className="form-actions">
                   <button type="submit" disabled={submitting} className="btn-submit">
@@ -886,6 +964,7 @@ function App() {
         minZoom={3} // Prevent zooming out too far
         style={{ height: "100vh", width: "100%" }}
         zoomControl={false} // Custom zoom control position if needed, or default
+        attributionControl={false}
       >
         <MapController center={flyToLocation} />
 
@@ -963,21 +1042,6 @@ function App() {
                           e.target.style.display = 'none';
                         }}
                       />
-                    ) : (pinIsSPV || pinIsIU) ? (
-                      <img
-                        src={pinIsSPV ? "/spv-logo.jpg" : "/iu-logo.png"}
-                        alt="School Logo"
-                        className="popup-avatar"
-                        style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '50%',
-                          objectFit: 'contain',
-                          background: pinIsIU ? '#990000' : 'white',
-                          border: `2px solid ${pinIsIU ? '#990000' : '#001030'}`,
-                          padding: '2px'
-                        }}
-                      />
                     ) : (
                       <div className="popup-avatar-placeholder" style={{
                         width: '40px',
@@ -994,12 +1058,19 @@ function App() {
                         {pin.full_name.charAt(0)}
                       </div>
                     )}
-                    <h3 style={{ margin: 0 }}>{pin.full_name}</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <h3 style={{ margin: 0 }}>@{pin.full_name}</h3>
+                      {pin.batch_year && (
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                          Batch of {pin.batch_year}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="tag">
                     <GraduationCap size={14} />
-                    <span><strong>{pin.school_name}</strong> {pin.batch_year && `'${pin.batch_year.toString().slice(-2)}`}</span>
+                    <span><strong>{pin.school_name}</strong></span>
                   </div>
                   <div className="tag">
                     <Briefcase size={14} />
@@ -1007,27 +1078,32 @@ function App() {
                   </div>
                   <div className="tag">
                     <MapPin size={14} />
-                    <span>{pin.city}</span>
+                    <CityResolver city={pin.city} lat={pin.latitude} lon={pin.longitude} />
                   </div>
                   {pin.contact_info && (
                     <div className="contact-info">
-                      {pin.contact_info.startsWith('http') || pin.contact_info.includes('linkedin.com') ? (
-                        <>
-                          <Search size={14} style={{ opacity: 0.5 }} />
-                          <a
-                            href={pin.contact_info.startsWith('http') ? pin.contact_info : `https://${pin.contact_info}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ color: 'inherit', textDecoration: 'underline', wordBreak: 'break-all' }}
-                          >
-                            {pin.contact_info.replace('https://', '').replace('www.', '').split('/')[0] + '...'}
-                          </a>
-                        </>
-                      ) : (
-                        <>
-                          <Phone size={14} />
-                          <span>{pin.contact_info}</span>
-                        </>
+                      <Phone size={14} />
+                      <span>{pin.contact_info}</span>
+                    </div>
+                  )}
+
+                  {/* Social Media Links in Popup */}
+                  {(pin.linkedin_url || pin.instagram_url || pin.twitter_url) && (
+                    <div className="popup-social-links">
+                      {pin.linkedin_url && (
+                        <a href={pin.linkedin_url.startsWith('http') ? pin.linkedin_url : `https://${pin.linkedin_url}`} target="_blank" rel="noopener noreferrer" title="LinkedIn">
+                          <Linkedin size={18} />
+                        </a>
+                      )}
+                      {pin.instagram_url && (
+                        <a href={pin.instagram_url.startsWith('http') ? pin.instagram_url : `https://instagram.com/${pin.instagram_url.replace('@', '')}`} target="_blank" rel="noopener noreferrer" title="Instagram">
+                          <Instagram size={18} />
+                        </a>
+                      )}
+                      {pin.twitter_url && (
+                        <a href={pin.twitter_url.startsWith('http') ? pin.twitter_url : `https://${pin.twitter_url}`} target="_blank" rel="noopener noreferrer" title="X (Twitter)">
+                          <Twitter size={18} />
+                        </a>
                       )}
                     </div>
                   )}
@@ -1129,6 +1205,14 @@ function App() {
         </div>
       )}
       <Analytics />
+
+      {/* Credits */}
+      <div className="credits-corner">
+        <p>Powered by</p>
+        <strong>Nitin Gupta</strong>
+        <p style={{ fontWeight: 600, margin: '2px 0' }}>Sardar Patel Vidyalaya, Lodi Estate</p>
+        <p>Batch of 1995</p>
+      </div>
     </div>
   );
 }
