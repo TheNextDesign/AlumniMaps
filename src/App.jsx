@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams, Routes, Route } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMapEvents, ZoomControl } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { MapPin, Search, GraduationCap, Briefcase, Phone, Menu, X, Plus, School, LocateFixed, ChevronDown, ChevronUp, Lock, Linkedin, Instagram, Twitter } from 'lucide-react';
+import { MapPin, Search, GraduationCap, Briefcase, Phone, Menu, X, Plus, School, LocateFixed, ChevronDown, ChevronUp, Lock, Linkedin, Instagram, ArrowLeft, Mail, MessageCircle } from 'lucide-react';
 import './index.css';
 import indianSchools from './indian_institutes.json'; // Import the list
 import { supabase } from './supabaseClient'; // Import Supabase Client
@@ -40,13 +40,7 @@ L.Icon.Default.mergeOptions({
 });
 
 // Custom cluster icon
-const createClusterCustomIcon = function (cluster) {
-  return L.divIcon({
-    html: `<span>${cluster.getChildCount()}</span>`,
-    className: 'custom-cluster-icon',
-    iconSize: L.point(40, 40, true),
-  });
-};
+
 
 // Custom component to handle map clicks
 function MapEvents({ onMapClick, closeOverlays, setZoom }) {
@@ -141,6 +135,8 @@ function App() {
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState(false);
 
+
+
   // Sync state with URL
   useEffect(() => {
     if (schoolSlug) {
@@ -194,7 +190,6 @@ function App() {
     mobile_number: '',
     linkedin_url: '',
     instagram_url: '',
-    twitter_url: '',
     pincode: ''
   });
 
@@ -234,6 +229,20 @@ function App() {
       .slice(0, 50);
   }, [schoolInput]);
 
+  const createClusterCustomIcon = useCallback((cluster) => {
+    return L.divIcon({
+      html: `
+        <div class="marker-avatar-container cluster-pin">
+          <img src="${schoolLogo}" class="marker-avatar marker-logo-fit" alt="School Logo" />
+          <div class="cluster-badge">${cluster.getChildCount()}</div>
+        </div>
+      `,
+      className: 'custom-marker cluster-marker',
+      iconSize: [40, 70],
+      iconAnchor: [20, 55]
+    });
+  }, [schoolLogo]);
+
   const [suggestions, setSuggestions] = useState([]);
 
   useEffect(() => {
@@ -263,7 +272,7 @@ function App() {
     // Only allow clicking if we are in Step 2 (Pick Location)
     if (addStep === 2) {
       setNewPinLoc(latlng);
-      setAddStep(3); // Move to Details form
+      // Stay in Step 2, just show the pin and confirmation
     }
   };
 
@@ -309,14 +318,20 @@ function App() {
 
   const handleStep1Submit = async (e) => {
     e.preventDefault();
+
+    // Validate required fields
+    if (!formData.full_name) return showToast("Please enter your full name.", "error");
     if (!formData.city) return showToast("Please enter your city.", "error");
+    if (!formData.pincode) return showToast("Please enter your pincode.", "error");
 
     // Ensure school name is set from selectedSchool
     const finalFormData = { ...formData, school_name: selectedSchool };
 
-    // Fly to the city
+    // Fly to the city/pincode
     try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(formData.city)}&addressdetails=1&accept-language=en&limit=1`);
+      // Try searching with city + pincode for better accuracy
+      const searchQuery = formData.pincode ? `${formData.city} ${formData.pincode}` : formData.city;
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&addressdetails=1&accept-language=en&limit=1`);
       const data = await response.json();
       if (data && data.length > 0) {
         const { lat, lon, address, display_name } = data[0];
@@ -340,8 +355,9 @@ function App() {
 
         setFormData({ ...finalFormData, city: niceCityName });
         setAddStep(2); // Move to Pick Location
+        showToast("Now tap your exact location on the map", "info");
       } else {
-        showToast("City not found. Try a major city.", "error");
+        showToast("Location not found. Try a different city or pincode.", "error");
         setFormData(finalFormData);
       }
     } catch (err) {
@@ -349,11 +365,12 @@ function App() {
       // Even if fly fails, let them proceed
       setFormData(finalFormData);
       setAddStep(2);
+      showToast("Now tap your exact location on the map", "info");
     }
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!newPinLoc) return showToast("Location missing!", "error");
 
     setSubmitting(true);
@@ -392,10 +409,14 @@ function App() {
         console.log('No avatar file selected');
       }
 
+      // Strip pincode as it's not in the database schema (used for search accuracy only)
+      const { pincode, ...dbPayload } = formData;
+
       const payload = {
-        ...formData,
-        latitude: newPinLoc.lat,
-        longitude: newPinLoc.lng,
+        ...dbPayload,
+        batch_year: dbPayload.batch_year ? parseInt(dbPayload.batch_year) : null,
+        latitude: parseFloat(newPinLoc.lat),
+        longitude: parseFloat(newPinLoc.lng),
         avatar_url: avatarUrl
       };
 
@@ -415,7 +436,7 @@ function App() {
         setAvatarFile(null);
         setAvatarPreview(null);
         setFormData({
-          full_name: '', school_name: '', batch_year: '', profession: '', company: '', city: '', contact_info: '', mobile_number: '', linkedin_url: '', instagram_url: '', twitter_url: '', pincode: ''
+          full_name: '', school_name: '', batch_year: '', profession: '', company: '', city: '', contact_info: '', mobile_number: '', linkedin_url: '', instagram_url: '', pincode: ''
         });
         showToast("Pin added successfully!", "success");
       }
@@ -792,14 +813,14 @@ function App() {
           {addStep > 0 ? <X size={32} /> : <Plus size={32} />}
         </button>
 
-        {/* STEP 1: Pre-Fill School & City */}
+        {/* STEP 1: Complete Information Form */}
         {addStep === 1 && (
-          <div className="sidebar-panel">
+          <div className="sidebar-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <div className="sidebar-header">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', width: '100%' }}>
                 <div>
                   <h2>Step 1/2</h2>
-                  <p>Where are you from?</p>
+                  <p>Be the Part of the Family</p>
                 </div>
                 <button
                   onClick={() => setAddStep(0)}
@@ -811,118 +832,22 @@ function App() {
               </div>
             </div>
 
-            <form className="add-pin-form" onSubmit={handleStep1Submit} onClick={() => { setFormCitySuggestions([]); }}>
+            <form className="add-pin-form" onSubmit={handleStep1Submit} onClick={() => { setFormCitySuggestions([]); }} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+              {/* Scrollable Content Area */}
+              <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingBottom: '10px' }}>
+                <p className="section-label">Profile</p>
+                {/* School Name - Pre-filled and disabled */}
+                <input name="school_name" value={formData.school_name} disabled style={{ opacity: 0.7 }} />
 
-              {/* City Input */}
-              <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
-                <MapPin size={14} className="icon-input-overlay" style={{ position: 'absolute', right: 10, top: 12, opacity: 0.5 }} />
-                <input
-                  name="city"
-                  placeholder="City"
-                  required
-                  value={formData.city}
-                  onChange={(e) => {
-                    handleFormCityChange(e);
-                    setShowSchoolDropdown(false);
-                  }}
-                  onFocus={() => setShowSchoolDropdown(false)}
-                  autoComplete="off"
-                />
-                {formCitySuggestions.length > 0 && (
-                  <ul className="suggestions-list" style={{ maxHeight: '150px' }}>
-                    {formCitySuggestions.map((s) => (
-                      <li key={s.place_id} onClick={() => {
-                        setFormData({ ...formData, city: s.display_name.split(',')[0] });
-                        setFormCitySuggestions([]);
-                      }}>
-                        <MapPin size={14} className="icon-small" />
-                        {s.display_name}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              {/* Pincode Input */}
-              <div style={{ marginTop: '5px' }}>
-                <input
-                  name="pincode"
-                  placeholder="Pincode"
-                  required
-                  value={formData.pincode || ''}
-                  onChange={(e) => {
-                    // Only numbers for pincode
-                    const val = e.target.value.replace(/\D/g, '');
-                    setFormData({ ...formData, pincode: val });
-                  }}
-                  pattern="\d*"
-                  maxLength={10}
-                />
-              </div>
-
-              <button type="submit" className="btn-submit">
-                Next: Place Pin
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* STEP 2: Pick Location Instruction */}
-        {addStep === 2 && (
-          <div className="pin-instruction-compact">
-            <p>Tap your exact location on the map</p>
-          </div>
-        )}
-
-        {/* STEP 3: Final Details Form */}
-        {addStep === 3 && newPinLoc && (
-          <div className={`sidebar-panel ${formMinimized ? 'minimized' : ''}`}>
-            <div className="sidebar-header">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', width: '100%' }}>
-                <div>
-                  <h2>Final Step</h2>
-                  {!formMinimized && <p>Tell us about yourself!</p>}
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={() => setFormMinimized(!formMinimized)}
-                    className="btn-icon-minimize"
-                    title={formMinimized ? "Expand form" : "Minimize to adjust pin"}
-                  >
-                    {formMinimized ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setAddStep(0);
-                      setNewPinLoc(null);
-                      setFormMinimized(false);
-                    }}
-                    className="btn-icon-close"
-                    title="Close"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {!formMinimized && (
-              <form className="add-pin-form" onSubmit={handleSubmit}>
-                <div className="row">
-                  <input name="school_name" value={formData.school_name} disabled style={{ opacity: 0.7 }} />
-                  <input name="city" value={formData.city} disabled style={{ opacity: 0.7 }} />
-                </div>
-
-                <input name="full_name" placeholder="Full Name" required onChange={handleInputChange} autoFocus />
-                <input name="batch_year" placeholder="Batch Year (e.g. 2024)" type="number" onChange={handleInputChange} />
-                <input name="profession" placeholder="Profession" onChange={handleInputChange} />
-                <input name="company" placeholder="Company" onChange={handleInputChange} />
-                <input name="mobile_number" placeholder="Mobile No. (for WhatsApp)" type="tel" onChange={handleInputChange} />
+                <input name="full_name" placeholder="Full Name" required value={formData.full_name} onChange={handleInputChange} autoFocus />
+                <input name="batch_year" placeholder="Batch Year (e.g. 2024)" type="number" value={formData.batch_year} onChange={handleInputChange} />
+                <input name="profession" placeholder="Profession" value={formData.profession} onChange={handleInputChange} />
+                <input name="company" placeholder="Company" value={formData.company} onChange={handleInputChange} />
 
                 {/* Avatar Upload */}
                 <div style={{ marginTop: '10px' }}>
                   <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                    Profile Picture (Optional, max 200KB)
+                    Profile Picture (max 200KB)
                   </label>
                   <input
                     type="file"
@@ -955,36 +880,172 @@ function App() {
                   )}
                 </div>
 
-                <input name="contact_info" placeholder="Email (Optional)" onChange={handleInputChange} />
-
-                {/* Social Media Section */}
-                <div className="social-form-section">
-                  <p className="section-label">Social Media (Optional)</p>
-                  <div className="social-input-group">
-                    <div className="input-with-icon">
-                      <Linkedin size={18} className="social-icon-input" />
-                      <input name="linkedin_url" placeholder="LinkedIn Profile URL" onChange={handleInputChange} />
-                    </div>
-                    <div className="input-with-icon">
-                      <Instagram size={18} className="social-icon-input" />
-                      <input name="instagram_url" placeholder="Instagram Username" onChange={handleInputChange} />
-                    </div>
-                    <div className="input-with-icon">
-                      <Twitter size={18} className="social-icon-input" />
-                      <input name="twitter_url" placeholder="X (Twitter) Profile URL" onChange={handleInputChange} />
-                    </div>
+                {/* Contact Section */}
+                <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid var(--border)' }}>
+                  <p className="section-label">Contact</p>
+                  <p className="section-subheading">Best & Fastest way to reach you?</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <input
+                      name="mobile_number"
+                      placeholder="Mobile No. (for WhatsApp)"
+                      type="tel"
+                      value={formData.mobile_number}
+                      onChange={handleInputChange}
+                    />
+                    <input
+                      name="contact_info"
+                      placeholder="Email"
+                      value={formData.contact_info}
+                      onChange={handleInputChange}
+                    />
+                    <input
+                      name="linkedin_url"
+                      placeholder="LinkedIn Profile URL"
+                      value={formData.linkedin_url}
+                      onChange={handleInputChange}
+                    />
                   </div>
                 </div>
 
-                <div className="form-actions">
-                  <button type="submit" disabled={submitting} className="btn-submit">
-                    {submitting ? "Pinning..." : "Confirm & Join Map"}
-                  </button>
+                {/* Location Information */}
+                <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid var(--border)' }}>
+                  <p className="section-label">Your Location</p>
+
+                  {/* City Input with suggestions */}
+                  <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+                    <MapPin size={14} className="icon-input-overlay" style={{ position: 'absolute', right: 10, top: 12, opacity: 0.5 }} />
+                    <input
+                      name="city"
+                      placeholder="City"
+                      required
+                      value={formData.city}
+                      onChange={(e) => {
+                        handleFormCityChange(e);
+                        setShowSchoolDropdown(false);
+                      }}
+                      onFocus={() => setShowSchoolDropdown(false)}
+                      autoComplete="off"
+                    />
+                    {formCitySuggestions.length > 0 && (
+                      <ul className="suggestions-list" style={{ maxHeight: '150px' }}>
+                        {formCitySuggestions.map((s) => (
+                          <li key={s.place_id} onClick={() => {
+                            setFormData({ ...formData, city: s.display_name.split(',')[0] });
+                            setFormCitySuggestions([]);
+                          }}>
+                            <MapPin size={14} className="icon-small" />
+                            {s.display_name}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  {/* Pincode Input */}
+                  <div style={{ marginTop: '8px' }}>
+                    <input
+                      name="pincode"
+                      placeholder="Pincode"
+                      required
+                      value={formData.pincode || ''}
+                      onChange={(e) => {
+                        // Only numbers for pincode
+                        const val = e.target.value.replace(/\D/g, '');
+                        setFormData({ ...formData, pincode: val });
+                      }}
+                      pattern="\d*"
+                      maxLength={10}
+                    />
+                  </div>
                 </div>
-              </form>
-            )}
+              </div>
+
+              {/* Sticky Submit Button */}
+              <div style={{ padding: '15px 0 0', borderTop: '1px solid var(--border)', backgroundColor: 'var(--bg-sidebar)' }}>
+                <button type="submit" className="btn-submit" style={{ margin: 0, width: '100%' }}>
+                  Next: Place Pin on Map
+                </button>
+              </div>
+            </form>
           </div>
         )}
+
+
+
+        {/* STEP 2: After pin is placed, show confirmation */}
+        {addStep === 2 && newPinLoc && (
+          <div className="sidebar-panel">
+            <div className="sidebar-header" style={{ padding: '12px 15px' }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '36px 1fr 36px',
+                alignItems: 'center',
+                gap: '10px',
+                width: '100%'
+              }}>
+                {/* Back Button - Left */}
+                <button
+                  onClick={() => {
+                    setAddStep(1); // Go back to Step 1
+                    setNewPinLoc(null); // Clear the pin
+                  }}
+                  className="btn-icon-close"
+                  title="Back to Edit Info"
+                  style={{ width: '36px', height: '36px' }}
+                >
+                  <ArrowLeft size={18} />
+                </button>
+
+                {/* Title - Center */}
+                <div style={{ textAlign: 'center' }}>
+                  <h2 style={{ fontSize: '1.1rem', margin: '0 0 2px 0' }}>Confirm Location</h2>
+                  <p style={{ fontSize: '0.8rem', margin: 0, opacity: 0.8 }}>Is this pin in the right place?</p>
+                </div>
+
+                {/* Close Button - Right */}
+                <button
+                  onClick={() => {
+                    setAddStep(0);
+                    setNewPinLoc(null);
+                  }}
+                  className="btn-icon-close"
+                  title="Close"
+                  style={{ width: '36px', height: '36px' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div style={{ padding: '15px' }}>
+              <p style={{ marginBottom: '12px', color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: '1.4' }}>
+                You can drag the pin to adjust its position.
+              </p>
+
+              <div className="form-actions" style={{ gap: '8px' }}>
+                <button
+                  onClick={() => {
+                    setNewPinLoc(null);
+                  }}
+                  className="btn-submit"
+                  style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', padding: '10px 16px', fontSize: '0.9rem' }}
+                >
+                  Reposition Pin
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="btn-submit"
+                  style={{ padding: '10px 16px', fontSize: '0.9rem' }}
+                >
+                  {submitting ? "Pinning..." : "Confirm & Join Map"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+
       </div>
 
       {/* Main Map */}
@@ -1023,8 +1084,20 @@ function App() {
         <MarkerClusterGroup
           chunkedLoading
           iconCreateFunction={createClusterCustomIcon}
-          maxClusterRadius={50} // Cluster nearby pins
+          maxClusterRadius={70} // Slightly larger radius for logo-based clusters
           spiderfyOnMaxZoom={true}
+          zoomToBoundsOnClick={false}
+          eventHandlers={{
+            clusterclick: (e) => {
+              const cluster = e.layer;
+              const map = e.target._map;
+              map.flyToBounds(cluster.getBounds(), {
+                padding: [150, 150],
+                duration: 2.0,
+                easeLinearity: 0.20
+              });
+            }
+          }}
         >
           {filteredPins.map(pin => {
             // Generate consistent color based on name
@@ -1052,16 +1125,8 @@ function App() {
               html: displayIconUrl
                 ? `<div class="marker-avatar-container">
                      <img src="${displayIconUrl}" class="marker-avatar ${pinIsSPV || pinIsIU ? 'marker-logo-fit' : ''}" alt="${pin.full_name}" />
-                   </div>
-                   ${showNameLabel ? `<div class="marker-name-label">
-                     ${pin.full_name}
-                     ${pin.batch_year ? `<div style="font-size:0.65em; font-weight:400; opacity:0.9; margin-top:1px;">Batch of ${pin.batch_year}</div>` : ''}
-                   </div>` : ''}`
-                : `<div class="marker-avatar-placeholder" style="--pin-color: ${avatarBgColor}; background-color: ${avatarBgColor}">${pin.full_name.charAt(0)}</div>
-                   ${showNameLabel ? `<div class="marker-name-label">
-                     ${pin.full_name}
-                     ${pin.batch_year ? `<div style="font-size:0.65em; font-weight:400; opacity:0.9; margin-top:1px;">Batch of ${pin.batch_year}</div>` : ''}
-                   </div>` : ''}`,
+                   </div>`
+                : `<div class="marker-avatar-placeholder" style="--pin-color: ${avatarBgColor}; background-color: ${avatarBgColor}">${pin.full_name.charAt(0)}</div>`,
               iconSize: [40, 70], // Reduced size in config too
               iconAnchor: [20, 55],
               popupAnchor: [0, -60]
@@ -1073,11 +1138,37 @@ function App() {
                 position={[parseFloat(pin.latitude), parseFloat(pin.longitude)]}
                 icon={customIcon}
                 eventHandlers={{
-                  mouseover: (e) => {
+                  click: (e) => {
                     e.target.openPopup();
                   },
+                  mouseover: (e) => e.target.openPopup(),
+                  mouseout: (e) => e.target.closePopup()
                 }}
               >
+                {showNameLabel && (
+                  <Tooltip
+                    direction="right"
+                    offset={[28, -25]}
+                    opacity={1}
+                    permanent
+                    interactive={true}
+                    className="custom-label-tooltip"
+                    eventHandlers={{
+                      click: (e) => {
+                        L.DomEvent.stopPropagation(e);
+                        // Open the marker's popup when tooltip is clicked
+                        if (e.target._source) {
+                          e.target._source.openPopup();
+                        }
+                      }
+                    }}
+                  >
+                    <div className="tooltip-content">
+                      <div className="tooltip-name">{pin.full_name}</div>
+                      {pin.batch_year && <div className="tooltip-batch">Batch of {pin.batch_year}</div>}
+                    </div>
+                  </Tooltip>
+                )}
                 <Popup>
                   <div className="pin-popup">
                     {showNameLabel ? (
@@ -1142,29 +1233,27 @@ function App() {
                           <MapPin size={14} />
                           <CityResolver city={pin.city} lat={pin.latitude} lon={pin.longitude} />
                         </div>
-                        {pin.contact_info && (
-                          <div className="contact-info">
-                            <Phone size={14} />
-                            <span>{pin.contact_info}</span>
-                          </div>
-                        )}
-
-                        {/* Social Media Links in Popup */}
-                        {(pin.linkedin_url || pin.instagram_url || pin.twitter_url) && (
-                          <div className="popup-social-links">
+                        {/* Unified Contact Logos in Popup */}
+                        {(pin.mobile_number || pin.contact_info || pin.linkedin_url || pin.instagram_url) && (
+                          <div className="popup-social-links" style={{ justifyContent: 'center' }}>
+                            {pin.mobile_number && (
+                              <a href={`https://wa.me/${pin.mobile_number.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" title="WhatsApp">
+                                <MessageCircle size={20} />
+                              </a>
+                            )}
+                            {pin.contact_info && (
+                              <a href={`mailto:${pin.contact_info}`} title="Email">
+                                <Mail size={20} />
+                              </a>
+                            )}
                             {pin.linkedin_url && (
                               <a href={pin.linkedin_url.startsWith('http') ? pin.linkedin_url : `https://${pin.linkedin_url}`} target="_blank" rel="noopener noreferrer" title="LinkedIn">
-                                <Linkedin size={18} />
+                                <Linkedin size={20} />
                               </a>
                             )}
                             {pin.instagram_url && (
                               <a href={pin.instagram_url.startsWith('http') ? pin.instagram_url : `https://instagram.com/${pin.instagram_url.replace('@', '')}`} target="_blank" rel="noopener noreferrer" title="Instagram">
-                                <Instagram size={18} />
-                              </a>
-                            )}
-                            {pin.twitter_url && (
-                              <a href={pin.twitter_url.startsWith('http') ? pin.twitter_url : `https://${pin.twitter_url}`} target="_blank" rel="noopener noreferrer" title="X (Twitter)">
-                                <Twitter size={18} />
+                                <Instagram size={20} />
                               </a>
                             )}
                           </div>
@@ -1248,14 +1337,31 @@ function App() {
                 dragend: (e) => {
                   const marker = e.target;
                   const position = marker.getLatLng();
-                  setNewPinLoc([position.lat, position.lng]);
+                  setNewPinLoc(position); // Fixed: Pass LatLng object directly or consistent array
+                },
+                mouseover: (e) => {
+                  e.target.openPopup();
+                },
+                click: (e) => {
+                  e.target.openPopup();
                 }
               }}
             >
               <Popup>
                 <div style={{ textAlign: 'center' }}>
-                  <strong>New Pin Location</strong>
-                  <p style={{ margin: '5px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  {avatarPreview ? (
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', overflow: 'hidden', margin: '0 auto 8px', border: '2px solid var(--accent)' }}>
+                      <img src={avatarPreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                  ) : null}
+                  <strong style={{ display: 'block', fontSize: '1rem' }}>{formData.full_name || "New Pin"}</strong>
+                  {formData.batch_year && (
+                    <p style={{ margin: '2px 0', fontSize: '0.85rem' }}>Batch of {formData.batch_year}</p>
+                  )}
+                  {formData.profession && (
+                    <p style={{ margin: '2px 0 5px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{formData.profession}</p>
+                  )}
+                  <p style={{ margin: '5px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '4px' }}>
                     Drag to adjust position
                   </p>
                 </div>
@@ -1265,14 +1371,7 @@ function App() {
         }
       </MapContainer >
 
-      {/* Stats Pill - Only show when searching */}
-      {
-        filterSchool.trim() && (
-          <div className="stats-pill">
-            {`Found ${filteredPins.length} Alumni`}
-          </div>
-        )
-      }
+
       <Analytics />
 
       {/* Credits */}

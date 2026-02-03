@@ -613,10 +613,19 @@ body {
 .section-label {
   font-size: 0.85rem;
   color: var(--text-muted);
-  margin-bottom: 10px;
+  margin-bottom: 4px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.section-subheading {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  opacity: 0.8;
+  margin-bottom: 12px;
+  font-weight: 400;
+  line-height: 1.3;
 }
 
 .social-input-group {
@@ -667,17 +676,20 @@ body {
 }
 
 /* Brand Colors - Always Visible */
+.popup-social-links a[title="WhatsApp"] {
+  color: #25D366 !important;
+}
+
+.popup-social-links a[title="Email"] {
+  color: #EA4335 !important;
+}
+
 .popup-social-links a[title="LinkedIn"] {
   color: #0077b5 !important;
 }
 
 .popup-social-links a[title="Instagram"] {
   color: #E1306C !important;
-}
-
-.popup-social-links a[title="X (Twitter)"] {
-  color: #ffffff !important;
-  /* White for X on dark bg */
 }
 
 /* Leaflet Map Specifics */
@@ -1066,8 +1078,8 @@ body {
   height: 0;
   border-left: 12px solid transparent;
   border-right: 12px solid transparent;
-  border-top: 20px solid #001030;
-  /* Dark Blue Pin */
+  border-top: 20px solid #A0522D;
+  /* Darker Rust/Sienna Pin */
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
@@ -1076,8 +1088,8 @@ body {
   height: 36px;
   border-radius: 50%;
   object-fit: cover;
-  border: 3px solid #001030;
-  /* Dark Blue Border */
+  border: 3px solid #A0522D;
+  /* Darker Rust/Sienna Border */
   background: white;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   position: relative;
@@ -1101,8 +1113,9 @@ body {
   justify-content: center;
   font-weight: bold;
   font-size: 16px;
-  border: 3px solid #001030;
-  /* Dark Blue Border */
+  font-size: 16px;
+  border: 3px solid #A0522D;
+  /* Darker Rust/Sienna Border */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   text-transform: uppercase;
   position: relative;
@@ -1119,8 +1132,10 @@ body {
   height: 0;
   border-left: 12px solid transparent;
   border-right: 12px solid transparent;
-  border-top: 20px solid #001030;
-  /* Dark Blue Pin */
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 20px solid #A0522D;
+  /* Darker Rust/Sienna Pin */
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
   z-index: 1;
 }
@@ -1138,34 +1153,13 @@ body {
   white-space: nowrap;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   z-index: 0;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 
 
-/* Alumni Detail Card (Bottom Right) */
-.alumni-detail-card {
-  position: absolute;
-  bottom: 40px;
-  right: 40px;
-  width: 300px;
-  background: var(--bg-card);
-  backdrop-filter: var(--glass);
-  -webkit-backdrop-filter: var(--glass);
-  border: 1px solid var(--border);
-  padding: 20px;
-  border-radius: 20px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-  animation: slideUpCard 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
 
-/* ... existing Detail Card styles ... */
-/* NOTE: Keeping the rest of detail card styles implied if not replacing full block. */
-/* Appending new styles below */
 
 /* TOAST NOTIFICATIONS */
 .toast-container {
@@ -1301,107 +1295,7 @@ body {
   }
 }
 
-.alumni-detail-card h3 {
-  margin: 0;
-  font-size: 1.35rem;
-  color: #fff;
-  font-weight: 700;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding-bottom: 10px;
-  margin-bottom: 4px;
-}
 
-.close-card-btn {
-  position: absolute;
-  top: 15px;
-  right: 15px;
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
-  color: var(--text-muted);
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.close-card-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
-}
-
-.detail-row {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  color: var(--text-main);
-  font-size: 0.95rem;
-  line-height: 1.4;
-}
-
-.detail-row svg {
-  min-width: 18px;
-  /* Prevent shrinking */
-  margin-top: 3px;
-}
-
-.detail-highlight {
-  font-weight: 600;
-  color: var(--text-main);
-}
-
-.detail-sub {
-  color: var(--text-muted);
-  font-weight: 400;
-}
-
-.detail-row.contact {
-  margin-top: 6px;
-  padding-top: 12px;
-  border-top: 1px dashed rgba(255, 255, 255, 0.1);
-  color: var(--accent-secondary);
-}
-
-.whatsapp-btn-full {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: #25D366;
-  color: white;
-  padding: 10px;
-  border-radius: 12px;
-  text-decoration: none;
-  font-weight: 700;
-  font-size: 0.95rem;
-  margin-top: 10px;
-  transition: transform 0.2s, box-shadow 0.2s;
-  box-shadow: 0 4px 15px rgba(37, 211, 102, 0.3);
-}
-
-.whatsapp-btn-full:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(37, 211, 102, 0.4);
-}
-
-/* Mobile Adjustments for Detail Card */
-@media (max-width: 700px) {
-  .alumni-detail-card {
-    position: fixed;
-    bottom: 0;
-    right: 0;
-    left: 0;
-    width: 100%;
-    border-radius: 20px 20px 0 0;
-    box-sizing: border-box;
-    padding-bottom: 30px;
-    /* Safe area */
-    animation: slideUpPanel 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-}
 
 /* FINAL MOBILE OVERRIDES TO FIX SUGGESTION OVERLAP */
 @media (max-width: 700px) {
@@ -1758,7 +1652,7 @@ body {
 /* Pin Animation on Hover - Simple Upward Float */
 .custom-marker.interactive-marker:hover .marker-avatar-container,
 .custom-marker.interactive-marker:hover .marker-avatar-placeholder {
-  transform: scale(1.15) translateY(-5px);
+  transform: translateY(-5px);
   z-index: 10;
   border-color: #fff;
   /* Keep white border, maybe glow? */
@@ -1788,26 +1682,79 @@ body {
 }
 
 
-/* Cluster Icon Styling */
-.custom-cluster-icon {
-  background: rgba(183, 65, 14, 0.95);
-  /* Rust Orange #B7410E */
-  color: white;
-  border: 4px solid rgba(255, 255, 255, 0.4);
-  background-clip: padding-box;
-  border-radius: 50%;
-  display: flex !important;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 0.9rem;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
-  transition: all 0.2s ease;
+/* Cluster Icon Styling - Updated for Branding */
+.cluster-pin {
+  background-color: var(--accent) !important;
+  border-color: #fff !important;
 }
 
-.custom-cluster-icon:hover {
-  transform: scale(1.1);
-  background: #B7410E;
-  border-color: rgba(255, 255, 255, 0.8);
+.cluster-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #000;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+}
+
+.cluster-marker:hover .marker-avatar-container {
+  transform: translateY(-2px);
   z-index: 1000 !important;
+}
+
+
+/* Custom Label Tooltip (Replaces marker-name-label) */
+.custom-label-tooltip {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Remove the default triangle arrow from the tooltip */
+.custom-label-tooltip::before {
+  display: none !important;
+}
+
+.tooltip-content {
+  background: #000000;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: none;
+  font-family: 'Outfit', sans-serif;
+  font-size: 11px;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: auto;
+}
+
+.tooltip-name {
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+
+.tooltip-batch {
+  font-size: 9px;
+  font-weight: 500;
+  color: #ccc;
+  opacity: 0.9;
 }
