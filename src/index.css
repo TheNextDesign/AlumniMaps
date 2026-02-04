@@ -1146,19 +1146,43 @@ body {
 
 .marker-name-label {
   position: absolute;
-  top: 8px;
-  left: 45px;
-  background: rgba(0, 0, 0, 0.85);
+  top: -36px;
+  /* Moved up by ~12px (20% of pin height) */
+  left: 35px;
+  background: #000;
   color: white;
-  padding: 4px 8px;
-  border-radius: 3px;
-  font-size: 12px;
-  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 8px;
   white-space: nowrap;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  z-index: 0;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  z-index: 100;
   pointer-events: auto;
-  cursor: pointer;
+  /* Allow interaction */
+  cursor: pointer !important;
+  /* Show pointer to indicate clickability */
+  display: none;
+  /* Hidden by default */
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  line-height: 1.2;
+}
+
+/* Show labels only when map has "show-marker-labels" class (high zoom) */
+.show-marker-labels .marker-name-label {
+  display: flex !important;
+}
+
+.marker-name-label strong {
+  font-size: 14px;
+  font-weight: 700;
+  display: block;
+}
+
+.marker-name-label span {
+  font-size: 11px;
+  color: #b0b0b0;
+  font-weight: 500;
 }
 
 

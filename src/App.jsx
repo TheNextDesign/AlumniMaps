@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useParams, Routes, Route } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMapEvents, ZoomControl } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
@@ -69,9 +69,32 @@ function MapEvents({ onMapClick, closeOverlays, setZoom }) {
       map.closePopup();
     },
     zoomend: () => {
-      setZoom(map.getZoom());
+      const currentZoom = map.getZoom();
+      setZoom(currentZoom);
+      if (currentZoom < 10) {
+        map.closePopup();
+      }
+
+      // Direct DOM manipulation for reliable class toggling
+      const mapContainer = map.getContainer();
+      if (currentZoom >= 10) {
+        mapContainer.classList.add('show-marker-labels');
+      } else {
+        mapContainer.classList.remove('show-marker-labels');
+      }
     }
   });
+
+  // Initial check on mount
+  useEffect(() => {
+    const mapContainer = map.getContainer();
+    if (map.getZoom() >= 10) {
+      mapContainer.classList.add('show-marker-labels');
+    } else {
+      mapContainer.classList.remove('show-marker-labels');
+    }
+  }, [map]);
+
   return null;
 }
 
@@ -1304,6 +1327,7 @@ function App() {
         style={{ height: "100vh", width: "100%" }}
         zoomControl={false} // Custom zoom control position if needed, or default
         attributionControl={false}
+        className={zoomLevel >= 10 ? 'show-marker-labels' : ''}
       >
         <MapController center={flyToLocation} />
 
@@ -1372,6 +1396,10 @@ function App() {
                   : `<span>${pin.full_name.charAt(0)}</span>`
                 }
                   </div>
+                </div>
+                <div class="marker-name-label">
+                  <strong>${pin.full_name}</strong>
+                  ${pin.batch_year ? `<span>Batch of ${pin.batch_year}</span>` : ''}
                 </div>`,
               iconSize: [40, 58],
               iconAnchor: [20, 58],
@@ -1385,9 +1413,35 @@ function App() {
                 icon={customIcon}
                 eventHandlers={{
                   click: (e) => {
-                    e.target.openPopup();
+                    if (zoomLevel >= 10) {
+                      e.target.openPopup();
+                    } else {
+                      // Optional: You could add map.flyTo here if you wanted to zoom them in instead
+                      // e.target._map.flyTo(e.latlng, 12);
+                    }
                   },
-                  mouseover: (e) => e.target.openPopup()
+                  mouseover: (e) => {
+                    if (zoomLevel >= 10) {
+                      e.target.openPopup();
+                    }
+                  },
+                  add: (e) => {
+                    // After marker is added to map, attach event listeners to the name label
+                    setTimeout(() => {
+                      const markerElement = e.target._icon;
+                      if (markerElement) {
+                        const nameLabel = markerElement.querySelector('.marker-name-label');
+                        if (nameLabel && zoomLevel >= 10) {
+                          nameLabel.addEventListener('click', () => {
+                            e.target.openPopup();
+                          });
+                          nameLabel.addEventListener('mouseover', () => {
+                            e.target.openPopup();
+                          });
+                        }
+                      }
+                    }, 100);
+                  }
                 }}
               >
                 <Popup>
