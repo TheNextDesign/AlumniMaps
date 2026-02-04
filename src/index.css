@@ -1059,85 +1059,89 @@ body {
   border: none !important;
 }
 
-.marker-avatar-container {
+.marker-pin {
   position: relative;
-  width: 50px;
-  height: 60px;
+  width: 40px;
+  /* Increased width slightly */
+  height: 58px;
+  /* Adjusted height */
   display: flex;
   flex-direction: column;
   align-items: center;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
 }
 
-.marker-avatar-container::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  border-left: 12px solid transparent;
-  border-right: 12px solid transparent;
-  border-top: 20px solid #A0522D;
-  /* Darker Rust/Sienna Pin */
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
-}
-
-.marker-avatar {
-  width: 36px;
-  height: 36px;
+.marker-inner {
+  width: 34px;
+  /* Increased inner circle size */
+  height: 34px;
   border-radius: 50%;
-  object-fit: cover;
-  border: 3px solid #A0522D;
-  /* Darker Rust/Sienna Border */
   background: white;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  position: relative;
-  z-index: 2;
-}
-
-.marker-logo-fit {
-  object-fit: contain !important;
-  padding: 2px;
-}
-
-.marker-avatar-placeholder {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  /* background-color color set in JS */
-  color: #001030;
-  /* Dark text for better contrast */
+  border: 3px solid #80300B;
+  /* Darker Color & Thinner Border */
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: bold;
-  font-size: 16px;
-  font-size: 16px;
-  border: 3px solid #A0522D;
-  /* Darker Rust/Sienna Border */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  text-transform: uppercase;
+  overflow: hidden;
   position: relative;
   z-index: 2;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
 }
 
-.marker-avatar-placeholder::after {
+.marker-inner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.marker-inner.is-logo img {
+  object-fit: contain;
+  padding: 3px;
+}
+
+.marker-inner.is-placeholder {
+  color: #001030;
+  font-weight: 800;
+  font-size: 1rem;
+  text-transform: uppercase;
+}
+
+.marker-pin::after {
   content: '';
   position: absolute;
-  bottom: -23px;
+  top: 27px;
+  /* Adjusted to meet the larger circle */
   left: 50%;
   transform: translateX(-50%);
   width: 0;
   height: 0;
-  border-left: 12px solid transparent;
-  border-right: 12px solid transparent;
-  border-left: 12px solid transparent;
-  border-right: 12px solid transparent;
-  border-top: 20px solid #A0522D;
-  /* Darker Rust/Sienna Pin */
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  border-left: 14px solid transparent;
+  border-right: 14px solid transparent;
+  border-top: 26px solid #80300B;
+  /* Darker Color */
   z-index: 1;
+}
+
+/* Cluster Specifics */
+.cluster-pin .cluster-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #000;
+  /* Black badge as per reference image */
+  color: white;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  border: 2px solid white;
+  z-index: 10;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
 }
 
 .marker-name-label {
@@ -1684,28 +1688,11 @@ body {
 
 /* Cluster Icon Styling - Updated for Branding */
 .cluster-pin {
-  background-color: var(--accent) !important;
-  border-color: #fff !important;
+  background-color: transparent !important;
+  border: none !important;
 }
 
-.cluster-badge {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  background: #000;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  min-width: 18px;
-  height: 18px;
-  border-radius: 9px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #fff;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-  z-index: 10;
-}
+/* Cluster Badge style is already defined above, removing duplicate here */
 
 .cluster-marker:hover .marker-avatar-container {
   transform: translateY(-2px);
@@ -1781,4 +1768,40 @@ body {
     box-shadow: 0 0 0 0 rgba(183, 65, 14, 0);
     transform: scale(1);
   }
+}
+
+.btn-text-only {
+  background: none;
+  border: none;
+  color: var(--text-main);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 5px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  transition: opacity 0.2s;
+}
+
+.btn-text-only:hover {
+  opacity: 1;
+}
+
+.manual-school-form label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.search-input-group.error {
+  border-color: #ff4d4d !important;
+  box-shadow: 0 0 8px rgba(255, 77, 77, 0.2);
+}
+
+.error-message {
+  color: #ff4d4d;
+  font-size: 0.8rem;
+  margin-top: 8px;
+  margin-left: 2px;
+  font-weight: 500;
 }

@@ -125,8 +125,12 @@ function App() {
   // Toast State
   const [toasts, setToasts] = useState([]);
   const showToast = (message, type = 'info') => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, message, type }]);
+    setToasts(prev => {
+      // Prevent duplicate messages
+      if (prev.some(t => t.message === message)) return prev;
+      const id = Date.now();
+      return [...prev, { id, message, type }];
+    });
   };
 
   const removeToast = (id) => {
@@ -139,8 +143,20 @@ function App() {
 
   // School Selection State
   const [selectedSchool, setSelectedSchool] = useState(null);
+  const [schoolLogo, setSchoolLogo] = useState("/letscatchup-logo.jpg");
   const [schoolInput, setSchoolInput] = useState(''); // Search within map
   const [filterSchool, setFilterSchool] = useState('');
+  const [dbSchools, setDbSchools] = useState([]);
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualSchoolName, setManualSchoolName] = useState('');
+  const [manualSchoolLogo, setManualSchoolLogo] = useState(null);
+  const [manualSchoolLogoPreview, setManualSchoolLogoPreview] = useState(null);
+
+  // Consolidate schools
+  const allSchools = useMemo(() => {
+    const dbSchoolNames = dbSchools.map(s => s.name);
+    return [...new Set([...indianSchools, ...dbSchoolNames])];
+  }, [dbSchools]);
 
   // Auth State for / route
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -151,27 +167,56 @@ function App() {
 
   // Sync state with URL
   useEffect(() => {
-    if (schoolSlug) {
-      const school = findSchoolBySlug(schoolSlug);
-      if (school) {
-        setSelectedSchool(school);
-        setFilterSchool(school);
-        setSchoolInput(school);
+    const syncSchool = async () => {
+      if (schoolSlug) {
+        // 1. Try hardcoded list
+        const school = findSchoolBySlug(schoolSlug);
+        if (school) {
+          setSelectedSchool(school);
+          setFilterSchool(school);
+          setSchoolInput(school);
+
+          // Hardcoded logos
+          if (school === "Sardar Patel Vidyalaya, Lodi Estate") setSchoolLogo("/spv-logo.jpg");
+          else if (school === "Indiana University Bloomington") setSchoolLogo("/iu-logo.png");
+          else setSchoolLogo("/letscatchup-logo.jpg");
+          return;
+        }
+
+        // 2. Try DB fetching
+        try {
+          const { data, error } = await supabase
+            .from('schools')
+            .select('*')
+            .eq('slug', schoolSlug)
+            .single();
+
+          if (data) {
+            setSelectedSchool(data.name);
+            setFilterSchool(data.name);
+            setSchoolInput(data.name);
+            setSchoolLogo(data.logo_url || "/letscatchup-logo.jpg");
+          } else {
+            showToast("School map not found.", "error");
+            navigate('/', { replace: true });
+          }
+        } catch (err) {
+          console.error("Error fetching school:", err);
+          navigate('/', { replace: true });
+        }
       } else {
-        // Fallback for invalid slugs
-        showToast("School map not found.", "error");
-        navigate('/', { replace: true });
+        setSelectedSchool(null);
+        setFilterSchool('');
+        setSchoolInput('');
+        setSchoolLogo("/letscatchup-logo.jpg");
       }
-    } else {
-      setSelectedSchool(null);
-      setFilterSchool('');
-      setSchoolInput('');
-    }
+    };
+
+    syncSchool();
   }, [schoolSlug, navigate]);
 
   const isSPV = selectedSchool === "Sardar Patel Vidyalaya, Lodi Estate";
   const isIU = selectedSchool === "Indiana University Bloomington";
-  const schoolLogo = isSPV ? "/spv-logo.jpg" : (isIU ? "/iu-logo.png" : "/letscatchup-logo.jpg");
 
   // Near Me State
   const [nearMeActive, setNearMeActive] = useState(false);
@@ -210,7 +255,7 @@ function App() {
   const filteredSchoolsList = useMemo(() => {
     if (!formData.school_name) return [];
     const query = formData.school_name.toLowerCase();
-    return indianSchools
+    return allSchools
       .filter(s => s.toLowerCase().includes(query))
       .sort((a, b) => {
         const aStarts = a.toLowerCase().startsWith(query);
@@ -220,7 +265,7 @@ function App() {
         return a.localeCompare(b);
       })
       .slice(0, 50);
-  }, [formData.school_name]);
+  }, [formData.school_name, allSchools]);
 
   // Top Bar Search State
   const [showSchoolSearchDropdown, setShowSchoolSearchDropdown] = useState(false);
@@ -229,7 +274,7 @@ function App() {
   const filteredSearchSchools = useMemo(() => {
     if (!schoolInput) return [];
     const query = schoolInput.toLowerCase();
-    return indianSchools
+    return allSchools
       .filter(s => s.toLowerCase().includes(query))
       .sort((a, b) => {
         const aStarts = a.toLowerCase().startsWith(query);
@@ -239,19 +284,21 @@ function App() {
         return a.localeCompare(b);
       })
       .slice(0, 50);
-  }, [schoolInput]);
+  }, [schoolInput, allSchools]);
 
   const createClusterCustomIcon = useCallback((cluster) => {
     return L.divIcon({
       html: `
-        <div class="marker-avatar-container cluster-pin">
-          <img src="${schoolLogo}" class="marker-avatar marker-logo-fit" alt="School Logo" />
+        <div class="marker-pin cluster-pin">
+          <div class="marker-inner is-logo">
+            <img src="${schoolLogo}" alt="School Logo" />
+          </div>
           <div class="cluster-badge">${cluster.getChildCount()}</div>
         </div>
       `,
       className: 'custom-marker cluster-marker',
-      iconSize: [40, 70],
-      iconAnchor: [20, 55]
+      iconSize: [40, 58],
+      iconAnchor: [20, 58]
     });
   }, [schoolLogo]);
 
@@ -259,7 +306,19 @@ function App() {
 
   useEffect(() => {
     fetchPins();
+    fetchSchools();
   }, []);
+
+  const fetchSchools = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('schools')
+        .select('*');
+      if (data) setDbSchools(data);
+    } catch (err) {
+      console.error("Error fetching schools list:", err);
+    }
+  };
 
   const fetchPins = async () => {
     try {
@@ -285,6 +344,93 @@ function App() {
     if (addStep === 2) {
       setNewPinLoc(latlng);
       // Stay in Step 2, just show the pin and confirmation
+    }
+  };
+
+  // Handle manual school logo selection
+  const handleManualLogoChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Please select an image file', 'error');
+      return;
+    }
+
+    if (file.size > 500 * 1024) { // 500KB limit
+      showToast('Logo must be under 500KB', 'error');
+      return;
+    }
+
+    setManualSchoolLogo(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setManualSchoolLogoPreview(reader.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleCreateManualSchool = async (e) => {
+    e.preventDefault();
+    if (!manualSchoolName.trim()) return showToast("Please enter school name", "error");
+
+    setSubmitting(true);
+    try {
+      const slug = slugify(manualSchoolName);
+      let logoUrl = "/letscatchup-logo.jpg";
+
+      // Upload Logo if provided
+      if (manualSchoolLogo) {
+        const fileExt = manualSchoolLogo.name.split('.').pop();
+        const fileName = `logo-${slug}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `school-logos/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('avatars') // Or a dedicated 'logos' bucket if exists
+          .upload(filePath, manualSchoolLogo);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(filePath);
+
+        logoUrl = publicUrl;
+      }
+
+      // Insert School
+      const { data, error } = await supabase
+        .from('schools')
+        .insert([{
+          name: manualSchoolName.trim(),
+          slug,
+          logo_url: logoUrl
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === '23505') throw new Error("This school already exists!");
+        throw error;
+      }
+
+      showToast("School Map Generated!", "success");
+      setDbSchools(prev => [...prev, data]);
+      setShowManualEntry(false);
+      setManualSchoolName('');
+      setManualSchoolLogo(null);
+      setManualSchoolLogoPreview(null);
+
+      // Proactively set selected school and navigate
+      setSelectedSchool(data.name);
+      setFilterSchool(data.name);
+      setSchoolInput(data.name);
+      setSchoolLogo(data.logo_url || "/letscatchup-logo.jpg");
+      navigate(`/${slug}`);
+
+    } catch (err) {
+      console.error("Manual creation error:", err);
+      showToast(err.message || "Failed to create school map", "error");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -662,46 +808,135 @@ function App() {
           {!isAuthorized ? (
             <form className="password-gate" onSubmit={handlePasswordSubmit}>
               <label>Enter Portal Password</label>
-              <div className="search-input-group">
+              <div className={`search-input-group ${passwordError ? 'error' : ''}`}>
                 <Lock size={20} className="icon" />
                 <input
                   type="password"
                   placeholder="Password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (passwordError) setPasswordError(false);
+                  }}
                   autoFocus
                 />
               </div>
+              {passwordError && (
+                <p className="error-message">Incorrect password. Please try again.</p>
+              )}
               <button type="submit" className="btn-submit" style={{ marginTop: '20px', width: '100%' }}>
                 Access Portal
               </button>
             </form>
           ) : (
             <div className="welcome-search-group">
-              <label>Search for your Institution</label>
-              <div className="search-input-group">
-                <Search size={20} className="icon" />
-                <input
-                  type="text"
-                  placeholder="Ex. Sardar Patel Vidyalaya, Modern School..."
-                  value={schoolInput}
-                  onChange={(e) => {
-                    setSchoolInput(e.target.value);
-                    setShowSchoolSearchDropdown(true);
-                  }}
-                  onFocus={() => setShowSchoolSearchDropdown(true)}
-                />
-              </div>
+              {!showManualEntry ? (
+                <>
+                  <label>Search for your Institution</label>
+                  <div className="search-input-group">
+                    <Search size={20} className="icon" />
+                    <input
+                      type="text"
+                      placeholder="Ex. Sardar Patel Vidyalaya, Modern School..."
+                      value={schoolInput}
+                      onChange={(e) => {
+                        setSchoolInput(e.target.value);
+                        setShowSchoolSearchDropdown(true);
+                      }}
+                      onFocus={() => setShowSchoolSearchDropdown(true)}
+                    />
+                  </div>
 
-              {showSchoolSearchDropdown && schoolInput && filteredSearchSchools.length > 0 && (
-                <ul className="suggestions-list welcome-suggestions">
-                  {filteredSearchSchools.map((school, i) => (
-                    <li key={i} onClick={() => handleSelectSchool(school)}>
-                      <School size={16} className="icon-small" />
-                      {school}
-                    </li>
-                  ))}
-                </ul>
+                  {showSchoolSearchDropdown && schoolInput && filteredSearchSchools.length > 0 && (
+                    <ul className="suggestions-list welcome-suggestions">
+                      {filteredSearchSchools.map((school, i) => (
+                        <li key={i} onClick={() => handleSelectSchool(school)}>
+                          <School size={16} className="icon-small" />
+                          {school}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <button
+                    className="btn-text-only"
+                    style={{ marginTop: '12px', opacity: 0.8 }}
+                    onClick={() => setShowManualEntry(true)}
+                  >
+                    Don't see your school? Add it manually
+                  </button>
+                </>
+              ) : (
+                <form className="manual-school-form" onSubmit={handleCreateManualSchool}>
+                  <label>Register New Institution</label>
+                  <div className="search-input-group">
+                    <School size={20} className="icon" />
+                    <input
+                      type="text"
+                      placeholder="Full School Name"
+                      value={manualSchoolName}
+                      onChange={(e) => setManualSchoolName(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div style={{ marginTop: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', opacity: 0.8 }}>
+                      School Logo (Optional)
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                      <div
+                        className="logo-upload-preview"
+                        onClick={() => document.getElementById('school-logo-upload').click()}
+                        style={{
+                          width: '60px',
+                          height: '60px',
+                          borderRadius: '12px',
+                          border: '2px dashed var(--border)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          overflow: 'hidden',
+                          background: 'rgba(255,255,255,0.05)'
+                        }}
+                      >
+                        {manualSchoolLogoPreview ? (
+                          <img src={manualSchoolLogoPreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                        ) : (
+                          <Plus size={24} style={{ opacity: 0.5 }} />
+                        )}
+                      </div>
+                      <input
+                        id="school-logo-upload"
+                        type="file"
+                        hidden
+                        accept="image/*"
+                        onChange={handleManualLogoChange}
+                      />
+                      <p style={{ fontSize: '0.8rem', opacity: 0.6 }}>This will be used for all map pins</p>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                    <button
+                      type="button"
+                      className="btn-submit"
+                      style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-main)', flex: 1 }}
+                      onClick={() => setShowManualEntry(false)}
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn-submit"
+                      style={{ flex: 2 }}
+                      disabled={submitting}
+                    >
+                      {submitting ? "Generating..." : "Generate Map"}
+                    </button>
+                  </div>
+                </form>
               )}
             </div>
           )}
@@ -1123,23 +1358,24 @@ function App() {
             const avatarBgColor = getAvatarColor(pin.full_name);
 
             // Create custom icon with avatar
-            const pinIsSPV = pin.school_name === "Sardar Patel Vidyalaya, Lodi Estate";
-            const pinIsIU = pin.school_name === "Indiana University Bloomington";
-            const displayIconUrl = pinIsSPV ? "/spv-logo.jpg" : (pinIsIU ? "/iu-logo.png" : pin.avatar_url);
-
-            // Only show name label if zoom level > 7 (City level)
-            const showNameLabel = zoomLevel > 7;
+            const isCustomLogo = schoolLogo && schoolLogo !== "/letscatchup-logo.jpg";
+            const displayIconUrl = isCustomLogo ? schoolLogo : pin.avatar_url;
 
             const customIcon = L.divIcon({
-              className: `custom-marker ${showNameLabel ? 'interactive-marker' : ''}`,
-              html: displayIconUrl
-                ? `<div class="marker-avatar-container">
-                     <img src="${displayIconUrl}" class="marker-avatar ${pinIsSPV || pinIsIU ? 'marker-logo-fit' : ''}" alt="${pin.full_name}" />
-                   </div>`
-                : `<div class="marker-avatar-placeholder" style="--pin-color: ${avatarBgColor}; background-color: ${avatarBgColor}">${pin.full_name.charAt(0)}</div>`,
-              iconSize: [40, 70], // Reduced size in config too
-              iconAnchor: [20, 55],
-              popupAnchor: [0, -60]
+              className: 'custom-marker',
+              html: `
+                <div class="marker-pin">
+                  <div class="marker-inner ${isCustomLogo ? 'is-logo' : ''} ${!displayIconUrl ? 'is-placeholder' : ''}" 
+                       style="${!displayIconUrl ? `color: ${avatarBgColor}; background-color: white` : ''}">
+                    ${displayIconUrl
+                  ? `<img src="${displayIconUrl}" alt="${pin.full_name}" />`
+                  : `<span>${pin.full_name.charAt(0)}</span>`
+                }
+                  </div>
+                </div>`,
+              iconSize: [40, 58],
+              iconAnchor: [20, 58],
+              popupAnchor: [0, -45]
             });
 
             return (
@@ -1154,180 +1390,142 @@ function App() {
                   mouseover: (e) => e.target.openPopup()
                 }}
               >
-                {showNameLabel && (
-                  <Tooltip
-                    direction="right"
-                    offset={[28, -25]}
-                    opacity={1}
-                    permanent
-                    interactive={true}
-                    className="custom-label-tooltip"
-                    eventHandlers={{
-                      click: (e) => {
-                        L.DomEvent.stopPropagation(e);
-                        // Open the marker's popup when tooltip is clicked
-                        if (e.target._source) {
-                          e.target._source.openPopup();
-                        }
-                      }
-                    }}
-                  >
-                    <div className="tooltip-content">
-                      <div className="tooltip-name">{pin.full_name}</div>
-                      {pin.batch_year && <div className="tooltip-batch">Batch of {pin.batch_year}</div>}
-                    </div>
-                  </Tooltip>
-                )}
                 <Popup>
                   <div className="pin-popup">
-                    {showNameLabel ? (
-                      <>
-                        <div className="popup-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                          {pin.avatar_url ? (
-                            <img
-                              src={pin.avatar_url}
-                              alt={pin.full_name}
-                              className="popup-avatar"
-                              style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #fff' }}
-                              onError={(e) => {
-                                e.target.style.display = 'none';
-                              }}
-                            />
-                          ) : (
-                            <div className="popup-avatar-placeholder" style={{
-                              width: '40px',
-                              height: '40px',
-                              borderRadius: '50%',
-                              backgroundColor: avatarBgColor,
-                              color: '#001030', // Dark Royal Blue
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontWeight: 'bold',
-                              border: '2px solid #001030'
-                            }}>
-                              {pin.full_name.charAt(0)}
-                            </div>
-                          )}
-                          <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <h3 style={{ margin: 0 }}>@{pin.full_name}</h3>
-                            {pin.batch_year && (
-                              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                                Batch of {pin.batch_year}
-                              </span>
-                            )}
-                          </div>
+                    <div className="popup-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                      {pin.avatar_url ? (
+                        <img
+                          src={pin.avatar_url}
+                          alt={pin.full_name}
+                          className="popup-avatar"
+                          style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #fff' }}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="popup-avatar-placeholder" style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          backgroundColor: avatarBgColor,
+                          color: 'white', // White text for better contrast
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 'bold',
+                          border: '2px solid white'
+                        }}>
+                          {pin.full_name.charAt(0)}
                         </div>
-                      </>
-                    ) : (
-                      <div style={{ textAlign: 'center', padding: '5px' }}>
-                        <strong style={{ fontSize: '1rem', color: '#fff' }}>1 Alumni Found</strong>
-                        <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)' }}>
-                          Zoom in to see details
-                        </p>
+                      )}
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <h3 style={{ margin: 0 }}>@{pin.full_name}</h3>
+                        {pin.batch_year && (
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                            Batch of {pin.batch_year}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="tag">
+                      <GraduationCap size={14} />
+                      <span><strong>{pin.school_name}</strong></span>
+                    </div>
+                    <div className="tag">
+                      <Briefcase size={14} />
+                      <span>{pin.profession} {pin.company && `@ ${pin.company}`}</span>
+                    </div>
+                    <div className="tag">
+                      <MapPin size={14} />
+                      <CityResolver city={pin.city} lat={pin.latitude} lon={pin.longitude} />
+                    </div>
+                    {/* Unified Contact Logos in Popup */}
+                    {(pin.mobile_number || pin.contact_info || pin.linkedin_url || pin.instagram_url) && (
+                      <div className="popup-social-links" style={{ justifyContent: 'center' }}>
+                        {pin.mobile_number && (
+                          <a href={`https://wa.me/${pin.mobile_number.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" title="WhatsApp">
+                            <WhatsAppIcon size={20} />
+                          </a>
+                        )}
+                        {pin.contact_info && (
+                          <a href={`mailto:${pin.contact_info}`} title="Email">
+                            <Mail size={20} />
+                          </a>
+                        )}
+                        {pin.linkedin_url && (
+                          <a href={pin.linkedin_url.startsWith('http') ? pin.linkedin_url : `https://${pin.linkedin_url}`} target="_blank" rel="noopener noreferrer" title="LinkedIn">
+                            <Linkedin size={20} />
+                          </a>
+                        )}
+                        {pin.instagram_url && (
+                          <a href={pin.instagram_url.startsWith('http') ? pin.instagram_url : `https://instagram.com/${pin.instagram_url.replace('@', '')}`} target="_blank" rel="noopener noreferrer" title="Instagram">
+                            <Instagram size={20} />
+                          </a>
+                        )}
                       </div>
                     )}
 
-                    {showNameLabel && (
-                      <>
-                        <div className="tag">
-                          <GraduationCap size={14} />
-                          <span><strong>{pin.school_name}</strong></span>
-                        </div>
-                        <div className="tag">
-                          <Briefcase size={14} />
-                          <span>{pin.profession} {pin.company && `@ ${pin.company}`}</span>
-                        </div>
-                        <div className="tag">
-                          <MapPin size={14} />
-                          <CityResolver city={pin.city} lat={pin.latitude} lon={pin.longitude} />
-                        </div>
-                        {/* Unified Contact Logos in Popup */}
-                        {(pin.mobile_number || pin.contact_info || pin.linkedin_url || pin.instagram_url) && (
-                          <div className="popup-social-links" style={{ justifyContent: 'center' }}>
-                            {pin.mobile_number && (
-                              <a href={`https://wa.me/${pin.mobile_number.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" title="WhatsApp">
-                                <WhatsAppIcon size={20} />
-                              </a>
-                            )}
-                            {pin.contact_info && (
-                              <a href={`mailto:${pin.contact_info}`} title="Email">
-                                <Mail size={20} />
-                              </a>
-                            )}
-                            {pin.linkedin_url && (
-                              <a href={pin.linkedin_url.startsWith('http') ? pin.linkedin_url : `https://${pin.linkedin_url}`} target="_blank" rel="noopener noreferrer" title="LinkedIn">
-                                <Linkedin size={20} />
-                              </a>
-                            )}
-                            {pin.instagram_url && (
-                              <a href={pin.instagram_url.startsWith('http') ? pin.instagram_url : `https://instagram.com/${pin.instagram_url.replace('@', '')}`} target="_blank" rel="noopener noreferrer" title="Instagram">
-                                <Instagram size={20} />
-                              </a>
-                            )}
-                          </div>
-                        )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginTop: '10px' }}>
+                      {/* Directions Button (Left) */}
+                      <a
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${pin.latitude},${pin.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="directions-btn"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          backgroundColor: '#3b82f6', // Blue
+                          color: 'white',
+                          padding: '6px 10px',
+                          borderRadius: '15px',
+                          textDecoration: 'none',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                        }}
+                      >
+                        <MapPin size={12} />
+                        Directions
+                      </a>
 
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginTop: '10px' }}>
-                          {/* Directions Button (Left) */}
-                          <a
-                            href={`https://www.google.com/maps/dir/?api=1&destination=${pin.latitude},${pin.longitude}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="directions-btn"
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              backgroundColor: '#3b82f6', // Blue
-                              color: 'white',
-                              padding: '6px 10px',
-                              borderRadius: '15px',
-                              textDecoration: 'none',
-                              fontSize: '0.75rem',
-                              fontWeight: '600',
-                              boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-                            }}
+                      {/* WhatsApp Button (Right) */}
+                      {pin.mobile_number && (
+                        <a
+                          href={`https://wa.me/${pin.mobile_number.replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="whatsapp-btn"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            backgroundColor: '#25D366',
+                            color: 'white',
+                            padding: '6px 12px',
+                            borderRadius: '20px',
+                            textDecoration: 'none',
+                            fontSize: '0.85rem',
+                            fontWeight: '600',
+                            boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                          }}
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            width="18"
+                            height="18"
+                            fill="currentColor"
                           >
-                            <MapPin size={12} />
-                            Directions
-                          </a>
+                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                          </svg>
+                          Chat
+                        </a>
+                      )}
+                    </div>
 
-                          {/* WhatsApp Button (Right) */}
-                          {pin.mobile_number && (
-                            <a
-                              href={`https://wa.me/${pin.mobile_number.replace(/\D/g, '')}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="whatsapp-btn"
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                backgroundColor: '#25D366',
-                                color: 'white',
-                                padding: '6px 12px',
-                                borderRadius: '20px',
-                                textDecoration: 'none',
-                                fontSize: '0.85rem',
-                                fontWeight: '600',
-                                boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-                              }}
-                            >
-                              <svg
-                                viewBox="0 0 24 24"
-                                width="18"
-                                height="18"
-                                fill="currentColor"
-                              >
-                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-                              </svg>
-                              Chat
-                            </a>
-                          )}
-                        </div>
-                      </>
-                    )}
                   </div>
                 </Popup>
               </Marker>
@@ -1344,11 +1542,14 @@ function App() {
               draggable={true}
               icon={L.divIcon({
                 className: 'custom-marker dragging-marker',
-                html: `<div class="marker-avatar-container pulse-marker">
-                         <img src="${schoolLogo}" class="marker-avatar marker-logo-fit" alt="New Pin" />
-                       </div>`,
-                iconSize: [40, 70],
-                iconAnchor: [20, 55]
+                html: `
+                  <div class="marker-pin">
+                    <div class="marker-inner is-logo">
+                       <img src="${schoolLogo}" alt="New Pin" />
+                    </div>
+                  </div>`,
+                iconSize: [40, 58],
+                iconAnchor: [20, 58]
               })}
               eventHandlers={{
                 dragend: (e) => {
@@ -1367,10 +1568,12 @@ function App() {
 
       {/* Credits */}
       <div className="credits-corner">
-        <p>Powered by</p>
-        <strong>Nitin Gupta</strong>
-        <p style={{ fontWeight: 600, margin: '2px 0' }}>Sardar Patel Vidyalaya, Lodi Estate</p>
-        <p>Batch of 1995</p>
+        <p style={{ fontSize: '0.7rem', opacity: 0.8, marginBottom: '2px' }}>Powered by</p>
+        <strong style={{ fontSize: '1rem', display: 'block', marginBottom: '4px' }}>Nitin Gupta</strong>
+        <p style={{ margin: '0', fontSize: '0.85rem', fontWeight: 600 }}>Sardar Patel Vidyalaya</p>
+        <p style={{ margin: '0', fontSize: '0.8rem' }}>Export Marketing Strategist</p>
+        <p style={{ margin: '0', fontSize: '0.8rem', fontWeight: 600 }}>@THE NEXT DESIGN</p>
+        <p style={{ marginTop: '4px', fontSize: '0.75rem', opacity: 0.7 }}>Batch of 1995</p>
       </div>
     </div >
   );
