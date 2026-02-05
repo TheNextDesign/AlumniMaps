@@ -9,6 +9,7 @@ import './index.css';
 import indianSchools from './indian_institutes.json'; // Import the list
 import { supabase } from './supabaseClient'; // Import Supabase Client
 import Toast from './Toast'; // New Toast Component
+import PoweredBy from './PoweredBy'; // PoweredBy Component
 import { Analytics } from '@vercel/analytics/react';
 
 // Custom WhatsApp Icon Component
@@ -968,6 +969,9 @@ function App() {
             <p>Ready to reconnect? LetsCatchUp!</p>
           </div>
         </div>
+
+        {/* Credits */}
+        <PoweredBy />
       </div>
     );
   }
@@ -1621,14 +1625,7 @@ function App() {
       <Analytics />
 
       {/* Credits */}
-      <div className="credits-corner">
-        <p style={{ fontSize: '0.7rem', opacity: 0.8, marginBottom: '2px' }}>Powered by</p>
-        <strong style={{ fontSize: '1rem', display: 'block', marginBottom: '4px' }}>Nitin Gupta</strong>
-        <p style={{ margin: '0', fontSize: '0.85rem', fontWeight: 600 }}>Sardar Patel Vidyalaya</p>
-        <p style={{ margin: '0', fontSize: '0.8rem' }}>Export Marketing Strategist</p>
-        <p style={{ margin: '0', fontSize: '0.8rem', fontWeight: 600 }}>@THE NEXT DESIGN</p>
-        <p style={{ marginTop: '4px', fontSize: '0.75rem', opacity: 0.7 }}>Batch of 1995</p>
-      </div>
+      <PoweredBy />
     </div >
   );
 }
