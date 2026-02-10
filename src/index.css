@@ -165,7 +165,8 @@ body {
   display: flex;
   gap: 12px;
   align-items: center;
-  /* Ensure it doesn't break layout on desktop */
+  flex-wrap: wrap;
+  /* Allow wrapping on smaller screens */
 }
 
 /* FLOATING ACTION BUTTON (Add Pin) */
@@ -522,6 +523,23 @@ body {
 
   .search-input-group input {
     width: 100%;
+  }
+
+  .city-search-row {
+    width: 100%;
+    flex-direction: row;
+    /* Keep horizontal on mobile but allow wrapping */
+  }
+
+  .city-search-row .search-input-group {
+    flex: 1;
+    min-width: 140px;
+    /* Ensure minimum usable width */
+  }
+
+  .near-me-btn {
+    flex-shrink: 0;
+    /* Prevent button from shrinking */
   }
 
   .sidebar-container {

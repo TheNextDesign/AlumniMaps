@@ -247,6 +247,7 @@ function App() {
   const [userLocation, setUserLocation] = useState(null);
 
   const [filterCity, setFilterCity] = useState('');
+  const [filterBatchYear, setFilterBatchYear] = useState(''); // Batch year filter
   const [flyToLocation, setFlyToLocation] = useState(null); // { lat, lng }
   const [searchLocation, setSearchLocation] = useState(null); // [lat, lng] for filtering
 
@@ -774,10 +775,14 @@ function App() {
 
     const schoolMatch = p.school_name.toLowerCase().includes(filterSchool.toLowerCase());
 
+    // Batch year filter (optional, supports partial matching)
+    const batchMatch = !filterBatchYear.trim() ||
+      (p.batch_year && p.batch_year.toString().includes(filterBatchYear.trim()));
+
     // If a specific search location is set (via Enter or Suggestion), filter by distance (50km)
     if (searchLocation) {
       const dist = getDistanceFromLatLonInKm(searchLocation[0], searchLocation[1], p.latitude, p.longitude);
-      return schoolMatch && dist <= 50;
+      return schoolMatch && batchMatch && dist <= 50;
     }
 
     // Otherwise use text-based city filter (or show all if search is empty)
@@ -786,11 +791,11 @@ function App() {
     // If Near Me is active, also apply proximity filter
     if (nearMeActive && userLocation) {
       const dist = getDistanceFromLatLonInKm(userLocation.lat, userLocation.lng, p.latitude, p.longitude);
-      return schoolMatch && cityMatch && dist <= 50;
+      return schoolMatch && batchMatch && cityMatch && dist <= 50;
     }
 
-    // Standard filter: school + city
-    return schoolMatch && cityMatch;
+    // Standard filter: school + city + batch
+    return schoolMatch && batchMatch && cityMatch;
   });
 
   // Handle School selection on Welcome Screen
@@ -1043,6 +1048,21 @@ function App() {
             <LocateFixed size={20} />
           </button>
 
+          {/* Batch Year Filter */}
+          <div className="search-input-group" style={{ position: 'relative', minWidth: '160px' }}>
+            <GraduationCap size={18} className="icon" />
+            <input
+              type="text"
+              placeholder="Batch Year..."
+              value={filterBatchYear}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, ''); // Only allow numbers
+                setFilterBatchYear(value);
+              }}
+              maxLength={4}
+            />
+          </div>
+
           <div className="search-input-group" style={{ position: 'relative' }}>
             <MapPin size={18} className="icon" />
             <input
@@ -1066,6 +1086,7 @@ function App() {
             )}
           </div>
         </div>
+
       </div>
 
       {/* Sidebar Area (Add Pin Option) */}
