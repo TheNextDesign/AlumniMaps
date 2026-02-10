@@ -644,10 +644,72 @@ function App() {
       const value = formData.city;
       if (value && value.length > 2) {
         try {
-          const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(value)}&accept-language=en&limit=5&email=alumni_map_student@example.com`);
+          // Search for cities with addressdetails
+          const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(value)}&addressdetails=1&accept-language=en&limit=20&email=alumni_map_student@example.com`);
           const data = await response.json();
-          setFormCitySuggestions(data);
-        } catch (err) { }
+
+          const searchTerm = value.toLowerCase();
+
+          // Filter and rank results
+          const filteredData = data
+            .filter(item => {
+              const type = item.type;
+              const addr = item.address;
+
+              // Only include actual cities, towns, villages, or postcodes
+              const isValidType = type === 'city' || type === 'town' || type === 'village' ||
+                type === 'municipality' || type === 'postcode';
+
+              // Must have a city/town/village in address
+              const hasCity = addr?.city || addr?.town || addr?.village;
+
+              return isValidType || hasCity;
+            })
+            .map(item => {
+              const addr = item.address;
+              const city = addr?.city || addr?.town || addr?.village || addr?.county;
+              const state = addr?.state;
+              const country = addr?.country;
+              const postcode = addr?.postcode;
+
+              // Calculate relevance score
+              let score = 0;
+              const cityLower = city?.toLowerCase() || '';
+              const displayLower = item.display_name?.toLowerCase() || '';
+
+              // Exact match gets highest score
+              if (cityLower === searchTerm) score += 100;
+              // Starts with search term
+              else if (cityLower.startsWith(searchTerm)) score += 50;
+              // Contains search term in city name
+              else if (cityLower.includes(searchTerm)) score += 25;
+              // Check if display name contains search term (for variations/typos)
+              else if (displayLower.includes(searchTerm)) score += 15;
+
+              // Prefer cities over towns/villages
+              if (item.type === 'city') score += 10;
+              else if (item.type === 'town') score += 5;
+
+              // Format display name
+              let displayName = item.display_name;
+              if (city && state) {
+                displayName = `${city}, ${state}`;
+              } else if (city && country) {
+                displayName = `${city}, ${country}`;
+              } else if (postcode && city) {
+                displayName = `${city}, ${postcode}`;
+              }
+
+              return { ...item, display_name: displayName, score, cityName: city };
+            })
+            .filter(item => item.score > 0) // Only show items with relevance
+            .sort((a, b) => b.score - a.score) // Sort by relevance
+            .slice(0, 8); // Top 8 results
+
+          setFormCitySuggestions(filteredData);
+        } catch (err) {
+          console.error('Form city search error:', err);
+        }
       } else {
         setFormCitySuggestions([]);
       }
@@ -669,10 +731,72 @@ function App() {
       const value = filterCity;
       if (value && value.length > 2) {
         try {
-          const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(value)}&accept-language=en&limit=5&email=alumni_map_student@example.com`);
+          // Search for cities with addressdetails
+          const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(value)}&addressdetails=1&accept-language=en&limit=20&email=alumni_map_student@example.com`);
           const data = await response.json();
-          setSuggestions(data);
-        } catch (err) { }
+
+          const searchTerm = value.toLowerCase();
+
+          // Filter and rank results
+          const filteredData = data
+            .filter(item => {
+              const type = item.type;
+              const addr = item.address;
+
+              // Only include actual cities, towns, villages, or postcodes
+              const isValidType = type === 'city' || type === 'town' || type === 'village' ||
+                type === 'municipality' || type === 'postcode';
+
+              // Must have a city/town/village in address
+              const hasCity = addr?.city || addr?.town || addr?.village;
+
+              return isValidType || hasCity;
+            })
+            .map(item => {
+              const addr = item.address;
+              const city = addr?.city || addr?.town || addr?.village || addr?.county;
+              const state = addr?.state;
+              const country = addr?.country;
+              const postcode = addr?.postcode;
+
+              // Calculate relevance score
+              let score = 0;
+              const cityLower = city?.toLowerCase() || '';
+              const displayLower = item.display_name?.toLowerCase() || '';
+
+              // Exact match gets highest score
+              if (cityLower === searchTerm) score += 100;
+              // Starts with search term
+              else if (cityLower.startsWith(searchTerm)) score += 50;
+              // Contains search term in city name
+              else if (cityLower.includes(searchTerm)) score += 25;
+              // Check if display name contains search term (for variations/typos)
+              else if (displayLower.includes(searchTerm)) score += 15;
+
+              // Prefer cities over towns/villages
+              if (item.type === 'city') score += 10;
+              else if (item.type === 'town') score += 5;
+
+              // Format display name
+              let displayName = item.display_name;
+              if (city && state) {
+                displayName = `${city}, ${state}`;
+              } else if (city && country) {
+                displayName = `${city}, ${country}`;
+              } else if (postcode && city) {
+                displayName = `${city}, ${postcode}`;
+              }
+
+              return { ...item, display_name: displayName, score, cityName: city };
+            })
+            .filter(item => item.score > 0) // Only show items with relevance
+            .sort((a, b) => b.score - a.score) // Sort by relevance
+            .slice(0, 8); // Top 8 results
+
+          setSuggestions(filteredData);
+        } catch (err) {
+          console.error('City search error:', err);
+        }
       } else {
         setSuggestions([]);
       }
@@ -692,7 +816,8 @@ function App() {
   const selectSuggestion = (s) => {
     const lat = parseFloat(s.lat);
     const lon = parseFloat(s.lon);
-    setFilterCity(s.display_name.split(',')[0]);
+    // Use the formatted display name
+    setFilterCity(s.display_name);
     setFlyToLocation([lat, lon]);
     setSearchLocation([lat, lon]);
     setSuggestions([]);
