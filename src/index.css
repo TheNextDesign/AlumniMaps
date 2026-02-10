@@ -169,6 +169,132 @@ body {
   /* Allow wrapping on smaller screens */
 }
 
+/* More Filters Button */
+.more-filters-btn {
+  background: var(--bg-card);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border: 1px solid var(--border);
+  padding: 0 16px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: var(--shadow-lg);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  position: relative;
+}
+
+.more-filters-btn:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  transform: translateY(-2px);
+  background: rgba(0, 16, 48, 1);
+}
+
+.more-filters-btn.active {
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+  /* Professional blue gradient */
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+}
+
+.more-filters-btn span {
+  white-space: nowrap;
+}
+
+/* Filter Badge */
+.filter-badge {
+  background: var(--accent);
+  color: var(--bg-dark);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* Advanced Filters Panel */
+.advanced-filters-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 12px;
+  background: var(--bg-card);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  z-index: 999;
+  animation: slideDownFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+@keyframes slideDownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.advanced-filters-content {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.filter-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.filter-row .search-input-group {
+  margin: 0;
+}
+
+.filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+.btn-clear-filters {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-clear-filters:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
 /* FLOATING ACTION BUTTON (Add Pin) */
 .sidebar-container {
   position: absolute;
@@ -540,6 +666,33 @@ body {
   .near-me-btn {
     flex-shrink: 0;
     /* Prevent button from shrinking */
+  }
+
+  .more-filters-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .more-filters-btn span:first-of-type {
+    display: none;
+    /* Hide "Filters" text on mobile, keep icon */
+  }
+
+  .advanced-filters-panel {
+    left: -20px;
+    right: -20px;
+    width: calc(100% + 40px);
+    border-radius: 0;
+    margin-top: 10px;
+  }
+
+  .advanced-filters-content {
+    padding: 16px;
+  }
+
+  .filter-row {
+    flex-direction: column;
+    gap: 10px;
   }
 
   .sidebar-container {

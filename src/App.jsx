@@ -65,6 +65,7 @@ function MapEvents({ onMapClick, closeOverlays, setZoom }) {
     },
     dragstart: () => {
       map.closePopup();
+      if (closeOverlays) closeOverlays();
     },
     movestart: () => {
       map.closePopup();
@@ -248,6 +249,9 @@ function App() {
 
   const [filterCity, setFilterCity] = useState('');
   const [filterBatchYear, setFilterBatchYear] = useState(''); // Batch year filter
+  const [filterProfession, setFilterProfession] = useState(''); // Profession filter
+  const [filterCompany, setFilterCompany] = useState(''); // Company filter
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false); // Toggle advanced filters panel
   const [flyToLocation, setFlyToLocation] = useState(null); // { lat, lng }
   const [searchLocation, setSearchLocation] = useState(null); // [lat, lng] for filtering
 
@@ -904,10 +908,18 @@ function App() {
     const batchMatch = !filterBatchYear.trim() ||
       (p.batch_year && p.batch_year.toString().includes(filterBatchYear.trim()));
 
+    // Profession filter (optional)
+    const professionMatch = !filterProfession.trim() ||
+      (p.profession && p.profession.toLowerCase().includes(filterProfession.toLowerCase()));
+
+    // Company filter (optional)
+    const companyMatch = !filterCompany.trim() ||
+      (p.company && p.company.toLowerCase().includes(filterCompany.toLowerCase()));
+
     // If a specific search location is set (via Enter or Suggestion), filter by distance (50km)
     if (searchLocation) {
       const dist = getDistanceFromLatLonInKm(searchLocation[0], searchLocation[1], p.latitude, p.longitude);
-      return schoolMatch && batchMatch && dist <= 50;
+      return schoolMatch && batchMatch && professionMatch && companyMatch && dist <= 50;
     }
 
     // Otherwise use text-based city filter (or show all if search is empty)
@@ -916,11 +928,11 @@ function App() {
     // If Near Me is active, also apply proximity filter
     if (nearMeActive && userLocation) {
       const dist = getDistanceFromLatLonInKm(userLocation.lat, userLocation.lng, p.latitude, p.longitude);
-      return schoolMatch && batchMatch && cityMatch && dist <= 50;
+      return schoolMatch && batchMatch && professionMatch && companyMatch && cityMatch && dist <= 50;
     }
 
-    // Standard filter: school + city + batch
-    return schoolMatch && batchMatch && cityMatch;
+    // Standard filter: school + city + batch + profession + company
+    return schoolMatch && batchMatch && professionMatch && companyMatch && cityMatch;
   });
 
   // Handle School selection on Welcome Screen
@@ -1210,7 +1222,68 @@ function App() {
               </ul>
             )}
           </div>
+
+          {/* More Filters Button */}
+          <button
+            className={`more-filters-btn ${showAdvancedFilters ? 'active' : ''}`}
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            title="More Filters"
+          >
+            <Briefcase size={18} />
+            <span>Filters</span>
+            {(filterProfession || filterCompany) && (
+              <span className="filter-badge">
+                {[filterProfession, filterCompany].filter(Boolean).length}
+              </span>
+            )}
+            {showAdvancedFilters ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
         </div>
+
+        {/* Advanced Filters Panel */}
+        {showAdvancedFilters && (
+          <div className="advanced-filters-panel">
+            <div className="advanced-filters-content">
+              <div className="filter-row">
+                <div className="search-input-group" style={{ flex: 1 }}>
+                  <Briefcase size={18} className="icon" />
+                  <input
+                    type="text"
+                    placeholder="Profession (e.g., Software Engineer)..."
+                    value={filterProfession}
+                    onChange={(e) => setFilterProfession(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="filter-row">
+                <div className="search-input-group" style={{ flex: 1 }}>
+                  <Briefcase size={18} className="icon" />
+                  <input
+                    type="text"
+                    placeholder="Company (e.g., Google)..."
+                    value={filterCompany}
+                    onChange={(e) => setFilterCompany(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {(filterProfession || filterCompany) && (
+                <div className="filter-actions">
+                  <button
+                    className="btn-clear-filters"
+                    onClick={() => {
+                      setFilterProfession('');
+                      setFilterCompany('');
+                    }}
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
       </div>
 
@@ -1495,6 +1568,8 @@ function App() {
             // Also close sidebar form suggestions if open
             setShowSchoolDropdown(false);
             setFormCitySuggestions([]);
+            // Close advanced filters panel
+            setShowAdvancedFilters(false);
           }}
           setZoom={setZoomLevel}
         />
