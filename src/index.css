@@ -383,6 +383,18 @@ body {
   }
 }
 
+@keyframes bounce {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
 .sidebar-header h2 {
   margin: 0;
   font-size: 1.05rem;
@@ -1354,6 +1366,35 @@ body {
   font-size: 11px;
   color: #b0b0b0;
   font-weight: 500;
+}
+
+/* Draggable Pin Styling */
+.dragging-marker {
+  cursor: move !important;
+  cursor: grab !important;
+}
+
+.dragging-marker:active {
+  cursor: grabbing !important;
+}
+
+.dragging-marker .marker-pin {
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
+}
+
+
+
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.05);
+  }
 }
 
 

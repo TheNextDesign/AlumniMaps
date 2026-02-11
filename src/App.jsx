@@ -376,6 +376,14 @@ function App() {
     }
   };
 
+  // Ensure pin is placed when entering Step 2
+  useEffect(() => {
+    if (addStep === 2 && !newPinLoc && flyToLocation) {
+      // Automatically place pin at the center location
+      setNewPinLoc({ lat: flyToLocation[0], lng: flyToLocation[1] });
+    }
+  }, [addStep, flyToLocation, newPinLoc]);
+
   // Handle manual school logo selection
   const handleManualLogoChange = (e) => {
     const file = e.target.files[0];
@@ -522,7 +530,8 @@ function App() {
       const data = await response.json();
       if (data && data.length > 0) {
         const { lat, lon, address, display_name } = data[0];
-        setFlyToLocation([parseFloat(lat), parseFloat(lon)]);
+        const centerLocation = [parseFloat(lat), parseFloat(lon)];
+        setFlyToLocation(centerLocation);
 
         // Auto-update city name if we got better details (especially for pincodes)
         // Try to construct "City, State" or fallback to display_name
@@ -541,8 +550,11 @@ function App() {
         }
 
         setFormData({ ...finalFormData, city: niceCityName });
+
+        // Automatically place pin at the center of the searched location
+        setNewPinLoc({ lat: parseFloat(lat), lng: parseFloat(lon) });
         setAddStep(2); // Move to Pick Location
-        showToast("Now tap your exact location on the map", "info");
+        showToast("Drag the pin to your exact location", "info");
       } else {
         showToast("Location not found. Try a different city or pincode.", "error");
         setFormData(finalFormData);
@@ -552,7 +564,7 @@ function App() {
       // Even if fly fails, let them proceed
       setFormData(finalFormData);
       setAddStep(2);
-      showToast("Now tap your exact location on the map", "info");
+      showToast("Drag the pin to your exact location", "info");
     }
   };
 
@@ -1465,7 +1477,7 @@ function App() {
 
 
 
-        {/* STEP 2: After pin is placed, show confirmation */}
+        {/* STEP 2: Pin placed, show instructions to drag and confirm */}
         {addStep === 2 && newPinLoc && (
           <div className="sidebar-panel">
             <div className="sidebar-header" style={{ padding: '12px 15px' }}>
@@ -1491,8 +1503,8 @@ function App() {
 
                 {/* Title - Center */}
                 <div style={{ textAlign: 'center' }}>
-                  <h2 style={{ fontSize: '1rem', margin: '0 0 2px 0' }}>Confirm Location</h2>
-                  <p style={{ fontSize: '0.75rem', margin: 0, opacity: 0.8 }}>Is this pin in the right place?</p>
+                  <h2 style={{ fontSize: '1rem', margin: '0 0 2px 0' }}>Position Your Pin</h2>
+                  <p style={{ fontSize: '0.75rem', margin: 0, opacity: 0.8 }}>Step 2 of 2</p>
                 </div>
 
                 {/* Close Button - Right */}
@@ -1511,25 +1523,69 @@ function App() {
             </div>
 
             <div style={{ padding: '15px' }}>
+              {/* Instruction Box */}
+              <div style={{
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                border: '2px solid rgba(59, 130, 246, 0.3)',
+                borderRadius: '12px',
+                padding: '15px',
+                marginBottom: '15px',
+                textAlign: 'center'
+              }}>
+                <MapPin size={32} style={{
+                  color: '#3b82f6',
+                  marginBottom: '8px',
+                  animation: 'bounce 2s infinite'
+                }} />
+                <p style={{
+                  margin: '0 0 8px 0',
+                  fontWeight: '600',
+                  fontSize: '0.95rem',
+                  color: 'var(--text-main)'
+                }}>
+                  Drag the pin to your exact location
+                </p>
+                <p style={{
+                  margin: 0,
+                  fontSize: '0.8rem',
+                  color: 'var(--text-muted)',
+                  lineHeight: '1.4'
+                }}>
+                  Click and hold the pin on the map, then drag it to pinpoint your precise address
+                </p>
+              </div>
 
-
-              <div className="form-actions" style={{ gap: '8px' }}>
-                <button
-                  onClick={() => {
-                    setNewPinLoc(null);
-                  }}
-                  className="btn-submit"
-                  style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', padding: '10px 16px', fontSize: '0.8rem' }}
-                >
-                  Reposition Pin
-                </button>
+              {/* Action Buttons */}
+              <div className="form-actions" style={{ gap: '8px', flexDirection: 'column' }}>
                 <button
                   onClick={handleSubmit}
                   disabled={submitting}
                   className="btn-submit"
-                  style={{ padding: '10px 16px', fontSize: '0.8rem' }}
+                  style={{
+                    padding: '12px 16px',
+                    fontSize: '0.9rem',
+                    width: '100%',
+                    fontWeight: '600'
+                  }}
                 >
-                  {submitting ? "Pinning..." : "Confirm & Join Map"}
+                  {submitting ? "Adding Pin..." : "✓ Confirm & Join Map"}
+                </button>
+                <button
+                  onClick={() => {
+                    setNewPinLoc(null);
+                    showToast("Click on the map to place your pin", "info");
+                  }}
+                  className="btn-submit"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    color: 'var(--text-main)',
+                    padding: '10px 16px',
+                    fontSize: '0.8rem',
+                    width: '100%',
+                    border: '1px solid var(--border)'
+                  }}
+                >
+                  Reposition Pin
                 </button>
               </div>
             </div>
