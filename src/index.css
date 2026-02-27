@@ -45,20 +45,25 @@ body {
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
+  /* Slightly wider for better visibility */
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.8);
+  /* Solid white/gray for high visibility */
+  border: 2px solid transparent;
+  background-clip: padding-box;
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 1);
 }
 
 /* Glass Panel Utility */
@@ -369,6 +374,26 @@ body {
   overflow: hidden;
   /* Hide overflow, let children scroll */
   margin-bottom: 20px;
+  position: relative;
+  /* For the fade indicator */
+}
+
+/* Scroll Fade Indicator */
+.scroll-fade-area {
+  position: relative;
+}
+
+.scroll-fade-area::after {
+  content: '';
+  position: sticky;
+  bottom: 0px;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(to top, var(--bg-card) 0%, transparent 100%);
+  pointer-events: none;
+  z-index: 5;
+  display: block;
 }
 
 @keyframes slideUpFade {

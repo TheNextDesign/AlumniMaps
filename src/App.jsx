@@ -269,6 +269,7 @@ function App() {
     full_name: '',
     school_name: '',
     batch_year: '',
+    role: 'Student', // 'Student' or 'Teacher'
     profession: '',
     company: '',
     city: '',
@@ -524,27 +525,52 @@ function App() {
 
     // Fly to the city/pincode
     try {
-      // Try searching with city + pincode for better accuracy
-      const searchQuery = formData.pincode ? `${formData.city} ${formData.pincode}` : formData.city;
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&addressdetails=1&accept-language=en&limit=1`);
-      const data = await response.json();
+      // Robust multi-step search fallback
+      let data = [];
+      let finalSearchTerm = '';
+
+      // 1. Precise Structured Search (City + Pincode)
+      // This forces the map engine to respect both fields rather than guessing a phonetic match in another country (like Ecuador)
+      let structuredParams = `format=json&addressdetails=1&accept-language=en&limit=1`;
+      if (formData.pincode && formData.city) {
+        structuredParams += `&city=${encodeURIComponent(formData.city)}&postalcode=${encodeURIComponent(formData.pincode)}`;
+      } else if (formData.pincode) {
+        structuredParams += `&postalcode=${encodeURIComponent(formData.pincode)}`;
+      } else {
+        structuredParams += `&city=${encodeURIComponent(formData.city)}`;
+      }
+
+      const response1 = await fetch(`https://nominatim.openstreetmap.org/search?${structuredParams}`);
+      data = await response1.json();
+
+      // 2. Fallback to just Pincode (Pincode is usually the most accurate if city/pincode mismatch)
+      if ((!data || data.length === 0) && formData.pincode && formData.city) {
+        const response2 = await fetch(`https://nominatim.openstreetmap.org/search?format=json&postalcode=${encodeURIComponent(formData.pincode)}&addressdetails=1&accept-language=en&limit=1`);
+        data = await response2.json();
+      }
+
+      // 3. Fallback to Loose Query (q=) if structured search fails
+      if (!data || data.length === 0) {
+        const qVal = formData.pincode ? `${formData.city} ${formData.pincode}` : formData.city;
+        const response3 = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(qVal)}&addressdetails=1&accept-language=en&limit=1`);
+        data = await response3.json();
+      }
+
       if (data && data.length > 0) {
         const { lat, lon, address, display_name } = data[0];
         const centerLocation = [parseFloat(lat), parseFloat(lon)];
         setFlyToLocation(centerLocation);
 
-        // Auto-update city name if we got better details (especially for pincodes)
-        // Try to construct "City, State" or fallback to display_name
+        // Auto-update city name if we got better details
         let niceCityName = formData.city;
         if (address) {
-          const cityComponent = address.city || address.town || address.village || address.county || address.state_district;
+          const cityComponent = address.city || address.town || address.village || address.city_district || address.county || address.state_district;
           const stateComponent = address.state;
           const postcode = address.postcode;
 
           if (cityComponent && stateComponent) {
             niceCityName = `${cityComponent}, ${stateComponent}${postcode ? ' ' + postcode : ''}`;
           } else {
-            // Fallback to shorter display name (first 2 parts)
             niceCityName = display_name.split(',').slice(0, 2).join(',');
           }
         }
@@ -556,7 +582,7 @@ function App() {
         setAddStep(2); // Move to Pick Location
         showToast("Drag the pin to your exact location", "info");
       } else {
-        showToast("Location not found. Try a different city or pincode.", "error");
+        showToast(`Location not found for "${formData.city}". Try something else.`, "error");
         setFormData(finalFormData);
       }
     } catch (err) {
@@ -671,55 +697,55 @@ function App() {
             .filter(item => {
               const type = item.type;
               const addr = item.address;
+              const cls = item.class;
 
-              // Only include actual cities, towns, villages, or postcodes
+              // Include cities, towns, villages, municipalities, or relevant administrative areas
               const isValidType = type === 'city' || type === 'town' || type === 'village' ||
-                type === 'municipality' || type === 'postcode';
+                type === 'municipality' || type === 'postcode' || type === 'city_district' ||
+                type === 'district' || type === 'administrative';
 
-              // Must have a city/town/village in address
-              const hasCity = addr?.city || addr?.town || addr?.village;
+              // Must have a city-like component in address
+              const hasCity = addr?.city || addr?.town || addr?.village || addr?.municipality || addr?.city_district;
 
-              return isValidType || hasCity;
+              // Nominatim 'place' class is usually what we want for cities
+              return (cls === 'place' || cls === 'boundary') && (isValidType || hasCity);
             })
             .map(item => {
               const addr = item.address;
-              const city = addr?.city || addr?.town || addr?.village || addr?.county;
+              const city = addr?.city || addr?.town || addr?.village || addr?.municipality || addr?.city_district || addr?.county;
               const state = addr?.state;
               const country = addr?.country;
-              const postcode = addr?.postcode;
+              const importance = item.importance || 0;
 
               // Calculate relevance score
-              let score = 0;
+              const searchTermLower = searchTerm;
+              let score = importance * 100; // Use Nominatim's importance as base
               const cityLower = city?.toLowerCase() || '';
-              const displayLower = item.display_name?.toLowerCase() || '';
 
-              // Exact match gets highest score
-              if (cityLower === searchTerm) score += 100;
-              // Starts with search term
-              else if (cityLower.startsWith(searchTerm)) score += 50;
-              // Contains search term in city name
-              else if (cityLower.includes(searchTerm)) score += 25;
-              // Check if display name contains search term (for variations/typos)
-              else if (displayLower.includes(searchTerm)) score += 15;
+              // Exact match boost
+              if (cityLower === searchTermLower) score += 50;
+              // Starts with search term boost
+              else if (cityLower.startsWith(searchTermLower)) score += 20;
 
-              // Prefer cities over towns/villages
+              // Prefer certain types
               if (item.type === 'city') score += 10;
               else if (item.type === 'town') score += 5;
 
-              // Format display name
-              let displayName = item.display_name;
-              if (city && state) {
-                displayName = `${city}, ${state}`;
-              } else if (city && country) {
-                displayName = `${city}, ${country}`;
-              } else if (postcode && city) {
-                displayName = `${city}, ${postcode}`;
+              // Format display name: "City, State, Country" or "City, Country"
+              let displayName = '';
+              if (city) {
+                const parts = [city];
+                if (state && state !== city) parts.push(state);
+                if (country) parts.push(country);
+                displayName = parts.join(', ');
+              } else {
+                displayName = item.display_name.split(',').slice(0, 3).join(',');
               }
 
               return { ...item, display_name: displayName, score, cityName: city };
             })
-            .filter(item => item.score > 0) // Only show items with relevance
-            .sort((a, b) => b.score - a.score) // Sort by relevance
+            .filter(item => item.score > 0)
+            .sort((a, b) => b.score - a.score) // Sort by our calculated relevance
             .slice(0, 8); // Top 8 results
 
           setFormCitySuggestions(filteredData);
@@ -758,56 +784,56 @@ function App() {
             .filter(item => {
               const type = item.type;
               const addr = item.address;
+              const cls = item.class;
 
-              // Only include actual cities, towns, villages, or postcodes
+              // Include cities, towns, villages, municipalities, or relevant administrative areas
               const isValidType = type === 'city' || type === 'town' || type === 'village' ||
-                type === 'municipality' || type === 'postcode';
+                type === 'municipality' || type === 'postcode' || type === 'city_district' ||
+                type === 'district' || type === 'administrative';
 
-              // Must have a city/town/village in address
-              const hasCity = addr?.city || addr?.town || addr?.village;
+              // Must have a city-like component in address
+              const hasCity = addr?.city || addr?.town || addr?.village || addr?.municipality || addr?.city_district;
 
-              return isValidType || hasCity;
+              // Nominatim 'place' class for cities
+              return (cls === 'place' || cls === 'boundary') && (isValidType || hasCity);
             })
             .map(item => {
               const addr = item.address;
-              const city = addr?.city || addr?.town || addr?.village || addr?.county;
+              const city = addr?.city || addr?.town || addr?.village || addr?.municipality || addr?.city_district || addr?.county;
               const state = addr?.state;
               const country = addr?.country;
-              const postcode = addr?.postcode;
+              const importance = item.importance || 0;
 
               // Calculate relevance score
-              let score = 0;
+              const searchTermLower = searchTerm;
+              let score = importance * 100;
               const cityLower = city?.toLowerCase() || '';
-              const displayLower = item.display_name?.toLowerCase() || '';
 
-              // Exact match gets highest score
-              if (cityLower === searchTerm) score += 100;
-              // Starts with search term
-              else if (cityLower.startsWith(searchTerm)) score += 50;
-              // Contains search term in city name
-              else if (cityLower.includes(searchTerm)) score += 25;
-              // Check if display name contains search term (for variations/typos)
-              else if (displayLower.includes(searchTerm)) score += 15;
+              // Exact match boost
+              if (cityLower === searchTermLower) score += 50;
+              // Starts with search term boost
+              else if (cityLower.startsWith(searchTermLower)) score += 20;
 
-              // Prefer cities over towns/villages
+              // Prefer certain types
               if (item.type === 'city') score += 10;
               else if (item.type === 'town') score += 5;
 
               // Format display name
-              let displayName = item.display_name;
-              if (city && state) {
-                displayName = `${city}, ${state}`;
-              } else if (city && country) {
-                displayName = `${city}, ${country}`;
-              } else if (postcode && city) {
-                displayName = `${city}, ${postcode}`;
+              let displayName = '';
+              if (city) {
+                const parts = [city];
+                if (state && state !== city) parts.push(state);
+                if (country) parts.push(country);
+                displayName = parts.join(', ');
+              } else {
+                displayName = item.display_name.split(',').slice(0, 3).join(',');
               }
 
               return { ...item, display_name: displayName, score, cityName: city };
             })
-            .filter(item => item.score > 0) // Only show items with relevance
-            .sort((a, b) => b.score - a.score) // Sort by relevance
-            .slice(0, 8); // Top 8 results
+            .filter(item => item.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 8);
 
           setSuggestions(filteredData);
         } catch (err) {
@@ -1339,51 +1365,43 @@ function App() {
 
             <form className="add-pin-form" onSubmit={handleStep1Submit} onClick={() => { setFormCitySuggestions([]); }} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
               {/* Scrollable Content Area */}
-              <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingBottom: '10px' }}>
+              <div className="scroll-fade-area" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingBottom: '20px' }}>
                 <p className="section-label">Profile</p>
                 {/* School Name - Pre-filled and disabled */}
                 <input name="school_name" value={formData.school_name} disabled style={{ opacity: 0.7 }} />
 
                 <input name="full_name" placeholder="Full Name" required value={formData.full_name} onChange={handleInputChange} autoFocus />
+
                 <input name="batch_year" placeholder="Batch Year (e.g. 2024)" type="number" value={formData.batch_year} onChange={handleInputChange} />
+
+                {/* Role Selection */}
+                <div style={{ display: 'flex', gap: '20px', margin: '5px 0 10px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>
+                    <input
+                      type="radio"
+                      name="role"
+                      value="Student"
+                      checked={formData.role === 'Student'}
+                      onChange={handleInputChange}
+                      style={{ width: 'auto', margin: 0 }}
+                    />
+                    Student
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>
+                    <input
+                      type="radio"
+                      name="role"
+                      value="Teacher"
+                      checked={formData.role === 'Teacher'}
+                      onChange={handleInputChange}
+                      style={{ width: 'auto', margin: 0 }}
+                    />
+                    Teacher
+                  </label>
+                </div>
+
                 <input name="profession" placeholder="Profession" value={formData.profession} onChange={handleInputChange} />
                 <input name="company" placeholder="Company" value={formData.company} onChange={handleInputChange} />
-
-                {/* Avatar Upload */}
-                <div style={{ marginTop: '10px' }}>
-                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                    Profile Picture (max 200KB)
-                  </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="user"
-                    onChange={handleAvatarChange}
-                    style={{
-                      padding: '8px',
-                      border: '1px solid var(--border)',
-                      borderRadius: '8px',
-                      backgroundColor: 'var(--bg-card)',
-                      color: 'var(--text-main)',
-                      width: '100%'
-                    }}
-                  />
-                  {avatarPreview && (
-                    <div style={{ marginTop: '10px', textAlign: 'center' }}>
-                      <img
-                        src={avatarPreview}
-                        alt="Preview"
-                        style={{
-                          width: '80px',
-                          height: '80px',
-                          borderRadius: '50%',
-                          objectFit: 'cover',
-                          border: '2px solid var(--accent)'
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
 
                 {/* Contact Section */}
                 <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid var(--border)' }}>
@@ -1435,7 +1453,16 @@ function App() {
                       <ul className="suggestions-list" style={{ maxHeight: '150px' }}>
                         {formCitySuggestions.map((s) => (
                           <li key={s.place_id} onClick={() => {
-                            setFormData({ ...formData, city: s.display_name.split(',')[0] });
+                            // Extract city and postcode from the suggestion
+                            const addr = s.address;
+                            const cityName = addr?.city || addr?.town || addr?.village || addr?.municipality || s.display_name.split(',')[0];
+                            const postcode = addr?.postcode || '';
+
+                            setFormData({
+                              ...formData,
+                              city: cityName,
+                              pincode: postcode || formData.pincode // Fallback to current pincode if none in suggestion
+                            });
                             setFormCitySuggestions([]);
                           }}>
                             <MapPin size={14} className="icon-small" />
@@ -1462,6 +1489,43 @@ function App() {
                       maxLength={10}
                     />
                   </div>
+                </div>
+
+                {/* Avatar Upload - Moved to end */}
+                <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid var(--border)' }}>
+                  <p className="section-label">Photo</p>
+                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Profile Picture (max 200KB)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="user"
+                    onChange={handleAvatarChange}
+                    style={{
+                      padding: '8px',
+                      border: '1px solid var(--border)',
+                      borderRadius: '8px',
+                      backgroundColor: 'var(--bg-card)',
+                      color: 'var(--text-main)',
+                      width: '100%'
+                    }}
+                  />
+                  {avatarPreview && (
+                    <div style={{ marginTop: '10px', textAlign: 'center' }}>
+                      <img
+                        src={avatarPreview}
+                        alt="Preview"
+                        style={{
+                          width: '80px',
+                          height: '80px',
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                          border: '2px solid var(--accent)'
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
