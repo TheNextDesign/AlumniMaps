@@ -2038,10 +2038,14 @@ body {
   right: 10px;
   text-align: right;
   z-index: 999;
-  color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 8px;
   font-size: 0.75rem;
   pointer-events: none;
   line-height: 1.2;
+  backdrop-filter: blur(4px);
 }
 
 .credits-corner p {
@@ -2049,7 +2053,7 @@ body {
 }
 
 .credits-corner strong {
-  color: rgba(255, 255, 255, 0.9);
+  color: white;
   font-weight: 700;
   display: block;
 }

@@ -261,11 +261,16 @@ function App() {
   const [filterBatchYear, setFilterBatchYear] = useState(''); // Batch year filter
   const [filterProfession, setFilterProfession] = useState(''); // Profession filter
   const [filterCompany, setFilterCompany] = useState(''); // Company filter
+  const [filterRole, setFilterRole] = useState(''); // Role filter
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false); // Toggle advanced filters panel
   const [flyToLocation, setFlyToLocation] = useState(null); // { lat, lng }
   const [flyToZoom, setFlyToZoom] = useState(12);
   const [searchLocation, setSearchLocation] = useState(null); // [lat, lng] for filtering
   const [searchType, setSearchType] = useState('city'); // 'city' or 'country'
+
+  // Edit Mode State
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingPinId, setEditingPinId] = useState(null);
 
   // Applied filter states (only update when Search/Show Results is clicked)
   const [appliedCity, setAppliedCity] = useState('');
@@ -274,6 +279,7 @@ function App() {
   const [appliedCompany, setAppliedCompany] = useState('');
   const [appliedLocation, setAppliedLocation] = useState(null);
   const [appliedNearMe, setAppliedNearMe] = useState(false);
+  const [appliedRole, setAppliedRole] = useState('');
 
   // Add Pin Mode State
   const [addStep, setAddStep] = useState(0); // 0=Closed, 1=Pre-Form, 2=Pick-Location, 3=Details-Form
@@ -538,10 +544,20 @@ function App() {
     // Validate required fields
     if (!formData.full_name) return showToast("Please enter your full name.", "error");
     if (!formData.city) return showToast("Please enter your city.", "error");
-    if (!formData.pincode) return showToast("Please enter your pincode.", "error");
+    // Pincode only required for new pins to help geocoding
+    if (!isEditMode && !formData.pincode) return showToast("Please enter your pincode.", "error");
 
     // Ensure school name is set from selectedSchool
     const finalFormData = { ...formData, school_name: selectedSchool };
+
+    // If editing and didn't change city, skip geocoding and jump straight to submission
+    if (isEditMode) {
+      setFormData(finalFormData);
+      setAddStep(3); // In edit mode, we can show a final review or just submit
+      // Let's go to step 2 just in case they WANT to move the pin, but allow them to skip
+      setAddStep(2);
+      return;
+    }
 
     // Fly to the city/pincode
     try {
@@ -591,11 +607,17 @@ function App() {
 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    if (!newPinLoc) return showToast("Location missing!", "error");
+    if (!newPinLoc) return;
 
     setSubmitting(true);
     try {
-      let avatarUrl = '';
+      let avatarUrl = formData.avatar_url;
+
+      // Handle Edit Mode Update
+      if (isEditMode && editingPinId) {
+        await handleUpdatePin();
+        return;
+      }
 
       // Upload avatar if selected
       if (avatarFile) {
@@ -629,15 +651,19 @@ function App() {
         console.log('No avatar file selected');
       }
 
-      // Strip pincode as it's not in the database schema (used for search accuracy only)
-      const { pincode, ...dbPayload } = formData;
+      // Include pincode in database payload for better indexing and retrieval
+      const dbPayload = { ...formData };
+
+      // Generate a secret key for authentication-less editing
+      const secretKey = Math.random().toString(36).substring(2) + Date.now().toString(36);
 
       const payload = {
         ...dbPayload,
         batch_year: dbPayload.batch_year ? parseInt(dbPayload.batch_year) : null,
         latitude: parseFloat(newPinLoc.lat),
         longitude: parseFloat(newPinLoc.lng),
-        avatar_url: avatarUrl
+        avatar_url: avatarUrl,
+        secret_key: secretKey
       };
 
       const { data, error } = await supabase
@@ -650,11 +676,18 @@ function App() {
       if (data) {
         setPins([data[0], ...pins]);
 
+        // Save ownership to localStorage
+        const ownedPins = JSON.parse(localStorage.getItem('alumni_owned_pins') || '{}');
+        ownedPins[data[0].id] = secretKey;
+        localStorage.setItem('alumni_owned_pins', JSON.stringify(ownedPins));
+
         // Reset Everything
         setAddStep(0);
         setNewPinLoc(null);
         setAvatarFile(null);
         setAvatarPreview(null);
+        setIsEditMode(false);
+        setEditingPinId(null);
         setFormData({
           full_name: '', school_name: '', batch_year: '', profession: '', company: '', city: '', contact_info: '', mobile_number: '', linkedin_url: '', instagram_url: '', pincode: '', role: 'Student'
         });
@@ -666,6 +699,102 @@ function App() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleUpdatePin = async () => {
+    let storedKey = null;
+    try {
+      let avatarUrl = formData.avatar_url;
+      if (avatarFile) {
+        const fileExt = avatarFile.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, avatarFile);
+        if (uploadError) throw uploadError;
+        const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
+        avatarUrl = publicUrl;
+      }
+
+      // SUPER-STRICT PAYLOAD: Only send columns we are 100% sure the DB has
+      // This ensures that even if some SQL commands failed, the basic update works
+      const payload = {
+        full_name: formData.full_name || '',
+        school_name: formData.school_name || '',
+        batch_year: formData.batch_year ? parseInt(formData.batch_year) : null,
+        profession: formData.profession || '',
+        company: formData.company || '',
+        city: formData.city || '',
+        pincode: formData.pincode || '',
+        contact_info: formData.contact_info || '',
+        mobile_number: formData.mobile_number || '',
+        role: formData.role || 'Student',
+        latitude: parseFloat(newPinLoc.lat),
+        longitude: parseFloat(newPinLoc.lng),
+        avatar_url: avatarUrl
+      };
+
+      // Only add social links IF they have values to avoid schema errors on empty strings
+      if (formData.linkedin_url) payload.linkedin_url = formData.linkedin_url;
+      if (formData.instagram_url) payload.instagram_url = formData.instagram_url;
+
+      const ownedPins = JSON.parse(localStorage.getItem('alumni_owned_pins') || '{}');
+      storedKey = ownedPins[editingPinId];
+
+      if (!storedKey) {
+        throw new Error("Missing ownership key in your browser. (Did you clear your cache?)");
+      }
+
+      // Try the update
+      const { data, error } = await supabase
+        .from('alumni_pins')
+        .update(payload)
+        .eq('id', editingPinId)
+        .eq('secret_key', storedKey)
+        .select();
+
+      if (error) {
+        console.error('DATABASE ERROR:', error.message);
+        throw new Error("Update Failed: " + error.message);
+      }
+
+      if (data && data.length > 0) {
+        setPins(pins.map(p => p.id === editingPinId ? data[0] : p));
+        setAddStep(0);
+        setNewPinLoc(null);
+        setAvatarFile(null);
+        setAvatarPreview(null);
+        setIsEditMode(false);
+        setEditingPinId(null);
+        setFormData({
+          full_name: '', school_name: '', batch_year: '', profession: '', company: '', city: '', contact_info: '', mobile_number: '', linkedin_url: '', instagram_url: '', pincode: '', role: 'Student'
+        });
+        showToast("✓ Pin updated and moved successfully!", "success");
+      } else {
+        // RLS DIAGNOSTIC: If 0 rows updated, it is almost certainly a Row-Level Security (RLS) blockage
+        throw new Error("DATABASE BLOCKED: Your Supabase settings are preventing the update. Please run the SQL command provided to DISABLE Row Level Security on the table.");
+      }
+    } catch (err) {
+      console.error('Update Debug Info:', { id: editingPinId, key: !!storedKey, msg: err.message });
+      showToast(err.message, "error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleEditClick = (pin) => {
+    setFormData({
+      ...pin
+    });
+    setAvatarPreview(pin.avatar_url);
+    setNewPinLoc({ lat: pin.latitude, lng: pin.longitude });
+    setEditingPinId(pin.id);
+    setIsEditMode(true);
+    setAddStep(1);
+    showToast("Editing your pin details", "info");
+  };
+
+  const checkPinOwnership = (pinId) => {
+    const ownedPins = JSON.parse(localStorage.getItem('alumni_owned_pins') || '{}');
+    return !!ownedPins[pinId];
   };
 
 
@@ -903,6 +1032,7 @@ function App() {
     setAppliedBatchYear(filterBatchYear);
     setAppliedProfession(filterProfession);
     setAppliedCompany(filterCompany);
+    setAppliedRole(filterRole);
     setAppliedLocation(loc);
     setAppliedNearMe(nearMeActive);
 
@@ -970,6 +1100,9 @@ function App() {
 
   // Filter logic for pins
   const filteredPins = pins.filter(p => {
+    // Safety check for undefined pins
+    if (!p || !p.school_name) return false;
+
     // School filter is ALWAYS required
     if (!filterSchool.trim()) return false;
 
@@ -987,10 +1120,13 @@ function App() {
     const companyMatch = !appliedCompany.trim() ||
       (p.company && p.company.toLowerCase().includes(appliedCompany.toLowerCase()));
 
+    // Role filter (applied)
+    const roleMatch = !appliedRole || p.role === appliedRole;
+
     // Distance-based city filtering (applied)
     if (appliedLocation) {
       const dist = getDistanceFromLatLonInKm(appliedLocation[0], appliedLocation[1], p.latitude, p.longitude);
-      return schoolMatch && batchMatch && professionMatch && companyMatch && dist <= 50;
+      return schoolMatch && batchMatch && professionMatch && companyMatch && roleMatch && dist <= 50;
     }
 
     // Text-based city filter (applied)
@@ -999,11 +1135,11 @@ function App() {
     // Near Me proximity filter (applied)
     if (appliedNearMe && userLocation) {
       const dist = getDistanceFromLatLonInKm(userLocation.lat, userLocation.lng, p.latitude, p.longitude);
-      return schoolMatch && batchMatch && professionMatch && companyMatch && cityMatch && dist <= 50;
+      return schoolMatch && batchMatch && professionMatch && companyMatch && cityMatch && roleMatch && dist <= 50;
     }
 
-    // Standard filter: school + city + batch + profession + company
-    return schoolMatch && batchMatch && professionMatch && companyMatch && cityMatch;
+    // Standard filter: school + city + batch + profession + company + role
+    return schoolMatch && batchMatch && professionMatch && companyMatch && cityMatch && roleMatch;
   });
 
   // Handle School selection on Welcome Screen
@@ -1268,11 +1404,20 @@ function App() {
             <div className="sidebar-header">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', width: '100%' }}>
                 <div>
-                  <h2>Step 1/2</h2>
-                  <p>Be the Part of the Family</p>
+                  <h2>{isEditMode ? "Edit Your Profile" : "Step 1/2"}</h2>
+                  <p>{isEditMode ? "Update your details on the map" : "Be the Part of the Family"}</p>
                 </div>
                 <button
-                  onClick={() => setAddStep(0)}
+                  onClick={() => {
+                    setAddStep(0);
+                    setIsEditMode(false);
+                    setEditingPinId(null);
+                    setFormData({
+                      full_name: '', school_name: selectedSchool, batch_year: '', profession: '', company: '', city: '', contact_info: '', mobile_number: '', linkedin_url: '', instagram_url: '', pincode: '', role: 'Student'
+                    });
+                    setAvatarFile(null);
+                    setAvatarPreview(null);
+                  }}
                   className="btn-icon-close"
                   title="Close"
                 >
@@ -1286,10 +1431,10 @@ function App() {
               <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingBottom: '10px' }}>
                 <p className="section-label">Profile</p>
                 {/* School Name - Pre-filled and disabled */}
-                <input name="school_name" value={formData.school_name} disabled style={{ opacity: 0.7 }} />
+                <input name="school_name" value={formData.school_name || ''} disabled style={{ opacity: 0.7 }} />
 
-                <input name="full_name" placeholder="Full Name" required value={formData.full_name} onChange={handleInputChange} autoFocus />
-                <input name="batch_year" placeholder="Batch Year (e.g. 2024)" type="number" value={formData.batch_year} onChange={handleInputChange} />
+                <input name="full_name" placeholder="Full Name" required value={formData.full_name || ''} onChange={handleInputChange} autoFocus />
+                <input name="batch_year" placeholder="Batch Year (e.g. 2024)" type="number" value={formData.batch_year || ''} onChange={handleInputChange} />
 
                 {/* Role Selection: Student / Teacher */}
                 <div style={{ display: 'flex', gap: '25px', margin: '15px 5px', color: 'white', fontWeight: '500' }}>
@@ -1329,19 +1474,25 @@ function App() {
                       name="mobile_number"
                       placeholder="Mobile No. (for WhatsApp)"
                       type="tel"
-                      value={formData.mobile_number}
+                      value={formData.mobile_number || ''}
                       onChange={handleInputChange}
                     />
                     <input
                       name="contact_info"
                       placeholder="Email"
-                      value={formData.contact_info}
+                      value={formData.contact_info || ''}
                       onChange={handleInputChange}
                     />
                     <input
                       name="linkedin_url"
                       placeholder="LinkedIn Profile URL"
-                      value={formData.linkedin_url}
+                      value={formData.linkedin_url || ''}
+                      onChange={handleInputChange}
+                    />
+                    <input
+                      name="instagram_url"
+                      placeholder="Instagram Profile URL"
+                      value={formData.instagram_url || ''}
                       onChange={handleInputChange}
                     />
                   </div>
@@ -1358,7 +1509,7 @@ function App() {
                       name="city"
                       placeholder="City"
                       required
-                      value={formData.city}
+                      value={formData.city || ''}
                       onChange={(e) => {
                         handleFormCityChange(e);
                         setShowSchoolDropdown(false);
@@ -1452,7 +1603,7 @@ function App() {
               {/* Sticky Submit Button */}
               <div style={{ padding: '15px 0 0', borderTop: '1px solid var(--border)', backgroundColor: 'var(--bg-sidebar)' }}>
                 <button type="submit" className="btn-submit" style={{ margin: 0, width: '100%' }}>
-                  Next: Place Pin on Map
+                  {isEditMode ? "Update My Details" : "Next: Place Pin on Map"}
                 </button>
               </div>
             </form>
@@ -1487,14 +1638,16 @@ function App() {
 
                 {/* Title - Center */}
                 <div style={{ textAlign: 'center' }}>
-                  <h2 style={{ fontSize: '1rem', margin: '0 0 2px 0' }}>Position Your Pin</h2>
-                  <p style={{ fontSize: '0.75rem', margin: 0, opacity: 0.8 }}>Step 2 of 2</p>
+                  <h2 style={{ fontSize: '1rem', margin: '0 0 2px 0' }}>{isEditMode ? "Confirm Location" : "Position Your Pin"}</h2>
+                  <p style={{ fontSize: '0.75rem', margin: 0, opacity: 0.8 }}>{isEditMode ? "Update your marker position" : "Step 2 of 2"}</p>
                 </div>
 
                 {/* Close Button - Right */}
                 <button
                   onClick={() => {
                     setAddStep(0);
+                    setIsEditMode(false);
+                    setEditingPinId(null);
                     setNewPinLoc(null);
                   }}
                   className="btn-icon-close"
@@ -1527,7 +1680,7 @@ function App() {
                   fontSize: '0.95rem',
                   color: 'var(--text-main)'
                 }}>
-                  Drag the pin to your exact location
+                  {isEditMode ? "Verify your location pin" : "Drag the pin to your exact location"}
                 </p>
                 <p style={{
                   margin: 0,
@@ -1535,7 +1688,9 @@ function App() {
                   color: 'var(--text-muted)',
                   lineHeight: '1.4'
                 }}>
-                  Click and hold the pin on the map, then drag it to pinpoint your precise address
+                  {isEditMode
+                    ? "Your pin is placed at your current saved location. Drag it if you need to move it elsewhere."
+                    : "Click and hold the pin on the map, then drag it to pinpoint your precise address"}
                 </p>
               </div>
 
@@ -1552,7 +1707,7 @@ function App() {
                     fontWeight: '600'
                   }}
                 >
-                  {submitting ? "Adding Pin..." : "✓ Confirm & Join Map"}
+                  {submitting ? (isEditMode ? "Updating..." : "Adding Pin...") : (isEditMode ? "✓ Save Changes" : "✓ Confirm & Join Map")}
                 </button>
                 <button
                   onClick={() => {
@@ -1633,223 +1788,273 @@ function App() {
             }
           }}
         >
-          {filteredPins.map(pin => {
-            // Generate consistent color based on name
-            const getAvatarColor = (name) => {
-              const colors = [
-                '#FFCB42', '#FF6B6B', '#4ECDC4', '#45B7D1',
-                '#FFA07A', '#98D8C8', '#BB8FCE', '#85C1E2',
-                '#F8B739', '#52B788'
-              ];
-              const charCode = name.charCodeAt(0) || 0;
-              return colors[charCode % colors.length];
-            };
-            const avatarBgColor = getAvatarColor(pin.full_name);
+          {filteredPins
+            .filter(pin => !(isEditMode && pin.id === editingPinId))
+            .map(pin => {
+              // Generate consistent color based on name
+              const getAvatarColor = (name) => {
+                const colors = [
+                  '#FFCB42', '#FF6B6B', '#4ECDC4', '#45B7D1',
+                  '#FFA07A', '#98D8C8', '#BB8FCE', '#85C1E2',
+                  '#F8B739', '#52B788'
+                ];
+                const charCode = name.charCodeAt(0) || 0;
+                return colors[charCode % colors.length];
+              };
+              const avatarBgColor = getAvatarColor(pin.full_name);
 
-            // Create custom icon with avatar
-            const isCustomLogo = schoolLogo && schoolLogo !== "/letscatchup-logo.jpg";
-            const displayIconUrl = isCustomLogo ? schoolLogo : pin.avatar_url;
+              // Create custom icon with avatar
+              const isCustomLogo = schoolLogo && schoolLogo !== "/letscatchup-logo.jpg";
+              const displayIconUrl = isCustomLogo ? schoolLogo : pin.avatar_url;
 
-            const customIcon = L.divIcon({
-              className: 'custom-marker',
-              html: `
+              const customIcon = L.divIcon({
+                className: 'custom-marker',
+                html: `
                 <div class="marker-pin">
                   <div class="marker-inner ${isCustomLogo ? 'is-logo' : ''} ${!displayIconUrl ? 'is-placeholder' : ''}" 
                        style="${!displayIconUrl ? `color: ${avatarBgColor}; background-color: white` : ''}">
                     ${displayIconUrl
-                  ? `<img src="${displayIconUrl}" alt="${pin.full_name}" />`
-                  : `<span>${pin.full_name.charAt(0)}</span>`
-                }
+                    ? `<img src="${displayIconUrl}" alt="${pin.full_name}" />`
+                    : `<span>${pin.full_name.charAt(0)}</span>`
+                  }
                   </div>
                 </div>
                 <div class="marker-name-label">
                   <strong>${pin.full_name}</strong>
-                  ${pin.batch_year ? `<span>Batch of ${pin.batch_year}</span>` : ''}
+                  <div style="display: flex; gap: 4px; align-items: center; justify-content: flex-start; font-size: 0.75rem;">
+                    ${pin.batch_year ? `<span>Batch of ${pin.batch_year}</span>` : ''}
+                  </div>
                 </div>`,
-              iconSize: [40, 58],
-              iconAnchor: [20, 58],
-              popupAnchor: [0, -45]
-            });
+                iconSize: [40, 58],
+                iconAnchor: [20, 58],
+                popupAnchor: [0, -45]
+              });
 
-            return (
-              <Marker
-                key={pin.id}
-                position={[parseFloat(pin.latitude), parseFloat(pin.longitude)]}
-                icon={customIcon}
-                eventHandlers={{
-                  click: (e) => {
-                    if (zoomLevel >= 10) {
-                      e.target.openPopup();
-                    } else {
-                      // Optional: You could add map.flyTo here if you wanted to zoom them in instead
-                      // e.target._map.flyTo(e.latlng, 12);
-                    }
-                  },
-                  mouseover: (e) => {
-                    if (zoomLevel >= 10) {
-                      e.target.openPopup();
-                    }
-                  },
-                  add: (e) => {
-                    // After marker is added to map, attach event listeners to the name label
-                    setTimeout(() => {
-                      const markerElement = e.target._icon;
-                      if (markerElement) {
-                        const nameLabel = markerElement.querySelector('.marker-name-label');
-                        if (nameLabel && zoomLevel >= 10) {
-                          nameLabel.addEventListener('click', () => {
-                            e.target.openPopup();
-                          });
-                          nameLabel.addEventListener('mouseover', () => {
-                            e.target.openPopup();
-                          });
-                        }
+              return (
+                <Marker
+                  key={pin.id}
+                  position={[parseFloat(pin.latitude), parseFloat(pin.longitude)]}
+                  icon={customIcon}
+                  eventHandlers={{
+                    click: (e) => {
+                      if (zoomLevel >= 10) {
+                        e.target.openPopup();
+                      } else {
+                        // Optional: You could add map.flyTo here if you wanted to zoom them in instead
+                        // e.target._map.flyTo(e.latlng, 12);
                       }
-                    }, 100);
-                  }
-                }}
-              >
-                <Popup>
-                  <div className="pin-popup">
-                    <div className="popup-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                      {pin.avatar_url ? (
-                        <img
-                          src={pin.avatar_url}
-                          alt={pin.full_name}
-                          className="popup-avatar"
-                          style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #fff' }}
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div className="popup-avatar-placeholder" style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '50%',
-                          backgroundColor: avatarBgColor,
-                          color: 'white', // White text for better contrast
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 'bold',
-                          border: '2px solid white'
-                        }}>
-                          {pin.full_name.charAt(0)}
-                        </div>
-                      )}
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <h3 style={{ margin: 0 }}>@{pin.full_name}</h3>
-                        {pin.batch_year && (
-                          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                            Batch of {pin.batch_year}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="tag">
-                      <GraduationCap size={14} />
-                      <span><strong>{pin.school_name}</strong></span>
-                    </div>
-                    <div className="tag">
-                      <Briefcase size={14} />
-                      <span>{pin.profession} {pin.company && `@ ${pin.company}`}</span>
-                    </div>
-                    <div className="tag">
-                      <MapPin size={14} />
-                      <CityResolver city={pin.city} lat={pin.latitude} lon={pin.longitude} />
-                    </div>
-                    {/* Unified Contact Logos in Popup */}
-                    {(pin.mobile_number || pin.contact_info || pin.linkedin_url || pin.instagram_url) && (
-                      <div className="popup-social-links" style={{ justifyContent: 'center' }}>
-                        {pin.mobile_number && (
-                          <a href={`https://wa.me/${pin.mobile_number.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" title="WhatsApp">
-                            <WhatsAppIcon size={20} />
-                          </a>
-                        )}
-                        {pin.contact_info && (
-                          <a href={`mailto:${pin.contact_info}`} title="Email">
-                            <Mail size={20} />
-                          </a>
-                        )}
-                        {pin.linkedin_url && (
-                          <a href={pin.linkedin_url.startsWith('http') ? pin.linkedin_url : `https://${pin.linkedin_url}`} target="_blank" rel="noopener noreferrer" title="LinkedIn">
-                            <Linkedin size={20} />
-                          </a>
-                        )}
-                        {pin.instagram_url && (
-                          <a href={pin.instagram_url.startsWith('http') ? pin.instagram_url : `https://instagram.com/${pin.instagram_url.replace('@', '')}`} target="_blank" rel="noopener noreferrer" title="Instagram">
-                            <Instagram size={20} />
-                          </a>
-                        )}
-                      </div>
-                    )}
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginTop: '10px' }}>
-                      {/* Directions Button (Left) */}
-                      <a
-                        href={`https://www.google.com/maps/dir/?api=1&destination=${pin.latitude},${pin.longitude}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="directions-btn"
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '5px',
-                          backgroundColor: '#3b82f6', // Blue
-                          color: 'white',
-                          padding: '6px 10px',
-                          borderRadius: '15px',
-                          textDecoration: 'none',
-                          fontSize: '0.75rem',
-                          fontWeight: '600',
-                          boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-                        }}
-                      >
-                        <MapPin size={12} />
-                        Directions
-                      </a>
-
-                      {/* WhatsApp Button (Right) */}
-                      {pin.mobile_number && (
-                        <a
-                          href={`https://wa.me/${pin.mobile_number.replace(/\D/g, '')}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="whatsapp-btn"
-                          style={{
+                    },
+                    mouseover: (e) => {
+                      if (zoomLevel >= 10) {
+                        e.target.openPopup();
+                      }
+                    },
+                    add: (e) => {
+                      // After marker is added to map, attach event listeners to the name label
+                      setTimeout(() => {
+                        const markerElement = e.target._icon;
+                        if (markerElement) {
+                          const nameLabel = markerElement.querySelector('.marker-name-label');
+                          if (nameLabel && zoomLevel >= 10) {
+                            nameLabel.addEventListener('click', () => {
+                              e.target.openPopup();
+                            });
+                            nameLabel.addEventListener('mouseover', () => {
+                              e.target.openPopup();
+                            });
+                          }
+                        }
+                      }, 100);
+                    }
+                  }}
+                >
+                  <Popup>
+                    <div className="pin-popup">
+                      <div className="popup-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                        {pin.avatar_url ? (
+                          <img
+                            src={pin.avatar_url}
+                            alt={pin.full_name}
+                            className="popup-avatar"
+                            style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #fff' }}
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div className="popup-avatar-placeholder" style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '50%',
+                            backgroundColor: avatarBgColor,
+                            color: 'white', // White text for better contrast
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '6px',
-                            backgroundColor: '#25D366',
-                            color: 'white',
-                            padding: '6px 12px',
-                            borderRadius: '20px',
-                            textDecoration: 'none',
-                            fontSize: '0.85rem',
-                            fontWeight: '600',
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
-                          }}
-                        >
-                          <svg
-                            viewBox="0 0 24 24"
-                            width="18"
-                            height="18"
-                            fill="currentColor"
-                          >
-                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-                          </svg>
-                          Chat
-                        </a>
-                      )}
-                    </div>
+                            justifyContent: 'center',
+                            fontWeight: 'bold',
+                            border: '2px solid white'
+                          }}>
+                            {pin.full_name.charAt(0)}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <h3 style={{ margin: 0, lineHeight: 1 }}>@{pin.full_name}</h3>
+                            {pin.role && (
+                              <span style={{
+                                fontSize: '0.6rem',
+                                padding: '2px 6px',
+                                backgroundColor: pin.role === 'Teacher' ? 'rgba(255, 107, 107, 0.2)' : 'rgba(78, 205, 196, 0.2)',
+                                color: pin.role === 'Teacher' ? '#FF6B6B' : '#4ECDC4',
+                                borderRadius: '4px',
+                                textTransform: 'uppercase',
+                                fontWeight: 800,
+                                letterSpacing: '0.5px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                height: 'fit-content'
+                              }}>
+                                {pin.role}
+                              </span>
+                            )}
+                          </div>
+                          {pin.batch_year && (
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                              Batch of {pin.batch_year}
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-                  </div>
-                </Popup>
-              </Marker>
-            );
-          })}
+                      <div className="tag">
+                        <GraduationCap size={14} />
+                        <span><strong>{pin.school_name}</strong></span>
+                      </div>
+                      <div className="tag">
+                        <Briefcase size={14} />
+                        <span>{pin.profession} {pin.company && `@ ${pin.company}`}</span>
+                      </div>
+                      <div className="tag">
+                        <MapPin size={14} />
+                        <CityResolver city={pin.city} lat={pin.latitude} lon={pin.longitude} />
+                      </div>
+                      {/* Unified Contact Logos in Popup */}
+                      {(pin.mobile_number || pin.contact_info || pin.linkedin_url || pin.instagram_url) && (
+                        <div className="popup-social-links" style={{ justifyContent: 'center' }}>
+                          {pin.mobile_number && (
+                            <a href={`https://wa.me/${pin.mobile_number.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" title="WhatsApp">
+                              <WhatsAppIcon size={20} />
+                            </a>
+                          )}
+                          {pin.contact_info && (
+                            <a href={`mailto:${pin.contact_info}`} title="Email">
+                              <Mail size={20} />
+                            </a>
+                          )}
+                          {pin.linkedin_url && (
+                            <a href={pin.linkedin_url.startsWith('http') ? pin.linkedin_url : `https://${pin.linkedin_url}`} target="_blank" rel="noopener noreferrer" title="LinkedIn">
+                              <Linkedin size={20} />
+                            </a>
+                          )}
+                          {pin.instagram_url && (
+                            <a href={pin.instagram_url.startsWith('http') ? pin.instagram_url : `https://instagram.com/${pin.instagram_url.replace('@', '')}`} target="_blank" rel="noopener noreferrer" title="Instagram">
+                              <Instagram size={20} />
+                            </a>
+                          )}
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '8px' }}>
+                          {/* Directions Button (Left) */}
+                          <a
+                            href={`https://www.google.com/maps/dir/?api=1&destination=${pin.latitude},${pin.longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="directions-btn"
+                            style={{
+                              flex: 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '5px',
+                              backgroundColor: '#3b82f6', // Blue
+                              color: 'white',
+                              padding: '8px 10px',
+                              borderRadius: '12px',
+                              textDecoration: 'none',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                            }}
+                          >
+                            <MapPin size={12} />
+                            Directions
+                          </a>
+
+                          {/* WhatsApp Button (Right) */}
+                          {pin.mobile_number && (
+                            <a
+                              href={`https://wa.me/${pin.mobile_number.replace(/\D/g, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="whatsapp-btn"
+                              style={{
+                                flex: 1,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                backgroundColor: '#25D366',
+                                color: 'white',
+                                padding: '8px 10px',
+                                borderRadius: '12px',
+                                textDecoration: 'none',
+                                fontSize: '0.75rem',
+                                fontWeight: '600',
+                                boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                              }}
+                            >
+                              <svg
+                                viewBox="0 0 24 24"
+                                width="16"
+                                height="16"
+                                fill="currentColor"
+                              >
+                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                              </svg>
+                              Chat
+                            </a>
+                          )}
+                        </div>
+
+                        {/* Edit Pin Button (Only for owner) */}
+                        {checkPinOwnership(pin.id) && (
+                          <button
+                            onClick={() => handleEditClick(pin)}
+                            className="btn-submit"
+                            style={{
+                              margin: 0,
+                              padding: '8px',
+                              fontSize: '0.75rem',
+                              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                              border: '1px solid var(--border)',
+                              color: 'white',
+                              borderRadius: '12px',
+                              width: '100%',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            Edit My Details
+                          </button>
+                        )}
+                      </div>
+
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })}
         </MarkerClusterGroup>
 
         {/* Temporary Marker for New Pin - Draggable */}
@@ -1863,8 +2068,8 @@ function App() {
                 className: 'custom-marker dragging-marker',
                 html: `
                   <div class="marker-pin">
-                    <div class="marker-inner is-logo">
-                       <img src="${schoolLogo}" alt="New Pin" />
+                    <div class="marker-inner ${isEditMode && formData.avatar_url ? '' : 'is-logo'}">
+                       <img src="${(isEditMode && formData.avatar_url) ? formData.avatar_url : schoolLogo}" alt="New Pin" />
                     </div>
                   </div>`,
                 iconSize: [40, 58],
@@ -1874,7 +2079,7 @@ function App() {
                 dragend: (e) => {
                   const marker = e.target;
                   const position = marker.getLatLng();
-                  setNewPinLoc(position); // Fixed: Pass LatLng object directly or consistent array
+                  setNewPinLoc({ lat: position.lat, lng: position.lng }); // Standard format
                 }
               }}
             />
@@ -1950,6 +2155,41 @@ function App() {
                   onChange={(e) => setFilterCompany(e.target.value)}
                 />
               </div>
+
+              <div className="search-input-group" style={{ display: 'flex', gap: '10px', background: 'transparent', border: 'none', padding: '5px 0' }}>
+                <button
+                  onClick={() => setFilterRole(filterRole === 'Student' ? '' : 'Student')}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border)',
+                    backgroundColor: filterRole === 'Student' ? 'rgba(78, 205, 196, 0.2)' : 'rgba(255,255,255,0.05)',
+                    color: filterRole === 'Student' ? '#4ECDC4' : 'var(--text-muted)',
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Student
+                </button>
+                <button
+                  onClick={() => setFilterRole(filterRole === 'Teacher' ? '' : 'Teacher')}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border)',
+                    backgroundColor: filterRole === 'Teacher' ? 'rgba(255, 107, 107, 0.2)' : 'rgba(255,255,255,0.05)',
+                    color: filterRole === 'Teacher' ? '#FF6B6B' : 'var(--text-muted)',
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Teacher
+                </button>
+              </div>
             </div>
 
             <div className="search-panel-footer">
@@ -1962,6 +2202,7 @@ function App() {
                     setFilterBatchYear('');
                     setFilterProfession('');
                     setFilterCompany('');
+                    setFilterRole('');
                     setNearMeActive(false);
                   }}
                 >
@@ -1986,11 +2227,12 @@ function App() {
             </div>
           </div>
         </div>
-      )}
+      )
+      }
 
       <Analytics />
       <PoweredBy />
-    </div>
+    </div >
 
   );
 }
