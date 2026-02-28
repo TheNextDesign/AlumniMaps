@@ -45,25 +45,20 @@ body {
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  /* Slightly wider for better visibility */
+  width: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.8);
-  /* Solid white/gray for high visibility */
-  border: 2px solid transparent;
-  background-clip: padding-box;
+  background: rgba(255, 255, 255, 0.9);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 1);
+  background: #ffffff;
 }
 
 /* Glass Panel Utility */
@@ -300,51 +295,243 @@ body {
   transform: translateY(-1px);
 }
 
-/* FLOATING ACTION BUTTON (Add Pin) */
+/* SEARCH BUTTON & PANEL */
+.search-trigger-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  max-width: 500px;
+}
+
+.search-trigger-btn {
+  background: var(--bg-card);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border: 1px solid var(--border);
+  padding: 0 24px;
+  height: 48px;
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadow-lg);
+  cursor: pointer;
+  color: var(--text-main);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 100%;
+  max-width: 400px;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.search-trigger-btn:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+}
+
+.search-trigger-btn .icon {
+  opacity: 0.7;
+}
+
+.search-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 8, 24, 0.7);
+  backdrop-filter: blur(8px);
+  z-index: 2000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 100px;
+  padding-left: 20px;
+  padding-right: 20px;
+  animation: fadeIn 0.3s ease;
+}
+
+.search-panel {
+  background: var(--bg-card);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 24px;
+  width: 100%;
+  max-width: 450px;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: slideInDown 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.search-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.search-panel-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.search-panel-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.search-panel .search-input-group {
+  min-width: 0;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  position: relative;
+  /* Required for z-index */
+}
+
+/* Ensure suggestions for the first field (City) stay on top of the next ones */
+.search-panel-grid .search-input-group:nth-child(1) {
+  z-index: 10;
+}
+
+.search-panel-grid .search-input-group:nth-child(2) {
+  z-index: 9;
+}
+
+.search-panel-grid .search-input-group:nth-child(3) {
+  z-index: 8;
+}
+
+.search-panel-grid .search-input-group:nth-child(4) {
+  z-index: 7;
+}
+
+.search-panel-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.btn-search-apply {
+  background: var(--text-main);
+  color: var(--bg-dark);
+  border: none;
+  padding: 10px 24px;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-search-apply:hover {
+  background: #fff;
+  transform: scale(1.05);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .sidebar-container {
   position: absolute;
   bottom: 40px;
   left: 40px;
-  z-index: 1000;
+  z-index: 1001;
   display: flex;
   flex-direction: column-reverse;
-  /* Panel grows upwards */
-  align-items: flex-start;
-  gap: 16px;
+  /* Labels at bottom, button above */
+  align-items: center;
+  gap: 10px;
 }
 
 /* The FAB Trigger */
 /* The FAB Trigger */
 .sidebar-trigger-btn {
-  background: rgba(0, 16, 48, 0.95);
-  /* Deep Blue */
-  backdrop-filter: var(--glass);
-  -webkit-backdrop-filter: var(--glass);
-  border: 1px solid var(--border);
-  color: #fff;
+  background: #001030 !important;
+  /* Force Dark Midnight Blue */
+  border: none;
+  color: #ffffff !important;
   width: 64px;
   height: 64px;
-  border-radius: 20px;
+  border-radius: 18px;
+  /* Squircle look */
   cursor: pointer;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-  font-family: inherit;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1002;
 }
 
 .sidebar-trigger-btn:hover {
-  transform: scale(1.05) rotate(90deg) translateY(-4px);
-  background: #002263;
-  box-shadow: 0 25px 50px rgba(0, 16, 48, 0.6);
+  filter: brightness(1.1);
 }
 
 .sidebar-trigger-btn.active {
   background: #ef4444;
-  /* Red */
-  box-shadow: 0 10px 30px rgba(239, 68, 68, 0.4);
-  border-radius: 50%;
+  /* Keep red for cancel state but same shape */
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3);
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  /* Maintain the same rounded-square shape */
+}
+
+.trigger-label-pill {
+  background: #001030;
+  color: #ffffff;
+  padding: 6px 16px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  user-select: none;
+  pointer-events: none;
+  animation: fadeInLabel 0.3s ease;
+}
+
+@keyframes fadeInLabel {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .sidebar-trigger-btn svg {
@@ -374,26 +561,6 @@ body {
   overflow: hidden;
   /* Hide overflow, let children scroll */
   margin-bottom: 20px;
-  position: relative;
-  /* For the fade indicator */
-}
-
-/* Scroll Fade Indicator */
-.scroll-fade-area {
-  position: relative;
-}
-
-.scroll-fade-area::after {
-  content: '';
-  position: sticky;
-  bottom: 0px;
-  left: 0;
-  right: 0;
-  height: 40px;
-  background: linear-gradient(to top, var(--bg-card) 0%, transparent 100%);
-  pointer-events: none;
-  z-index: 5;
-  display: block;
 }
 
 @keyframes slideUpFade {
@@ -733,23 +900,52 @@ body {
   }
 
   .sidebar-container {
-    top: auto;
-    bottom: 30px;
+    bottom: 25px;
     left: 20px;
     right: 20px;
     width: auto;
-    align-items: stretch;
+    flex-direction: column-reverse;
+    align-items: center;
+    pointer-events: none;
   }
 
   .sidebar-trigger-btn {
+    pointer-events: auto;
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+    background: #001030 !important;
+    color: #ffffff !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    border: none;
+    display: flex;
+    align-items: center;
     justify-content: center;
   }
 
+  .sidebar-trigger-btn:hover {
+    transform: none;
+  }
+
+  .sidebar-trigger-btn svg {
+    width: 32px;
+    height: 32px;
+    color: #ffffff !important;
+  }
+
   .sidebar-panel {
-    width: 100%;
+    width: auto;
+    pointer-events: auto;
     /* Full width on mobile */
     box-sizing: border-box;
-    max-height: 60vh;
+    max-height: 80vh;
+    border-radius: 24px;
+    position: fixed;
+    bottom: 20px;
+    left: 15px;
+    right: 15px;
+    margin-bottom: 0;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
   }
 }
 
@@ -1785,6 +1981,53 @@ body {
 
   .branding-text p {
     display: none;
+  }
+
+  .top-bar {
+    flex-direction: column;
+    width: calc(100% - 40px);
+    gap: 10px;
+  }
+
+  .search-trigger-container {
+    max-width: none;
+    width: 100%;
+  }
+
+  .search-trigger-btn {
+    max-width: none;
+    height: 44px;
+    font-size: 0.85rem;
+    padding: 0 16px;
+  }
+
+  .search-panel-overlay {
+    padding-top: 60px;
+    align-items: center;
+  }
+
+  .search-panel {
+    border-radius: 24px;
+    position: fixed;
+    bottom: 20px;
+    left: 15px;
+    right: 15px;
+    width: auto;
+    max-height: 85vh;
+    overflow-y: auto;
+    animation: slideInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

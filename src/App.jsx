@@ -131,13 +131,22 @@ function CityResolver({ city, lat, lon }) {
 }
 
 // Component to handle map movements
-function MapController({ center }) {
+function MapController({ center, zoom = 12 }) {
   const map = useMapEvents({});
   useEffect(() => {
     if (center) {
-      map.flyTo(center, 12, { duration: 2 });
+      map.flyTo(center, zoom, { duration: 2 });
     }
-  }, [center, map]);
+  }, [center, zoom, map]);
+  return null;
+}
+
+function ZoomTracker({ setZoomLevel }) {
+  const map = useMapEvents({
+    zoomend: () => {
+      setZoomLevel(map.getZoom());
+    },
+  });
   return null;
 }
 
@@ -149,6 +158,7 @@ function App() {
 
   // Toast State
   const [toasts, setToasts] = useState([]);
+  const [showSearchPanel, setShowSearchPanel] = useState(false);
   const showToast = (message, type = 'info') => {
     setToasts(prev => {
       // Prevent duplicate messages
@@ -253,7 +263,17 @@ function App() {
   const [filterCompany, setFilterCompany] = useState(''); // Company filter
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false); // Toggle advanced filters panel
   const [flyToLocation, setFlyToLocation] = useState(null); // { lat, lng }
+  const [flyToZoom, setFlyToZoom] = useState(12);
   const [searchLocation, setSearchLocation] = useState(null); // [lat, lng] for filtering
+  const [searchType, setSearchType] = useState('city'); // 'city' or 'country'
+
+  // Applied filter states (only update when Search/Show Results is clicked)
+  const [appliedCity, setAppliedCity] = useState('');
+  const [appliedBatchYear, setAppliedBatchYear] = useState('');
+  const [appliedProfession, setAppliedProfession] = useState('');
+  const [appliedCompany, setAppliedCompany] = useState('');
+  const [appliedLocation, setAppliedLocation] = useState(null);
+  const [appliedNearMe, setAppliedNearMe] = useState(false);
 
   // Add Pin Mode State
   const [addStep, setAddStep] = useState(0); // 0=Closed, 1=Pre-Form, 2=Pick-Location, 3=Details-Form
@@ -269,7 +289,6 @@ function App() {
     full_name: '',
     school_name: '',
     batch_year: '',
-    role: 'Student', // 'Student' or 'Teacher'
     profession: '',
     company: '',
     city: '',
@@ -277,7 +296,8 @@ function App() {
     mobile_number: '',
     linkedin_url: '',
     instagram_url: '',
-    pincode: ''
+    pincode: '',
+    role: 'Student' // Default role
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -525,52 +545,27 @@ function App() {
 
     // Fly to the city/pincode
     try {
-      // Robust multi-step search fallback
-      let data = [];
-      let finalSearchTerm = '';
-
-      // 1. Precise Structured Search (City + Pincode)
-      // This forces the map engine to respect both fields rather than guessing a phonetic match in another country (like Ecuador)
-      let structuredParams = `format=json&addressdetails=1&accept-language=en&limit=1`;
-      if (formData.pincode && formData.city) {
-        structuredParams += `&city=${encodeURIComponent(formData.city)}&postalcode=${encodeURIComponent(formData.pincode)}`;
-      } else if (formData.pincode) {
-        structuredParams += `&postalcode=${encodeURIComponent(formData.pincode)}`;
-      } else {
-        structuredParams += `&city=${encodeURIComponent(formData.city)}`;
-      }
-
-      const response1 = await fetch(`https://nominatim.openstreetmap.org/search?${structuredParams}`);
-      data = await response1.json();
-
-      // 2. Fallback to just Pincode (Pincode is usually the most accurate if city/pincode mismatch)
-      if ((!data || data.length === 0) && formData.pincode && formData.city) {
-        const response2 = await fetch(`https://nominatim.openstreetmap.org/search?format=json&postalcode=${encodeURIComponent(formData.pincode)}&addressdetails=1&accept-language=en&limit=1`);
-        data = await response2.json();
-      }
-
-      // 3. Fallback to Loose Query (q=) if structured search fails
-      if (!data || data.length === 0) {
-        const qVal = formData.pincode ? `${formData.city} ${formData.pincode}` : formData.city;
-        const response3 = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(qVal)}&addressdetails=1&accept-language=en&limit=1`);
-        data = await response3.json();
-      }
-
+      // Try searching with city + pincode for better accuracy
+      const searchQuery = formData.pincode ? `${formData.city} ${formData.pincode}` : formData.city;
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&addressdetails=1&accept-language=en&limit=1`);
+      const data = await response.json();
       if (data && data.length > 0) {
         const { lat, lon, address, display_name } = data[0];
         const centerLocation = [parseFloat(lat), parseFloat(lon)];
         setFlyToLocation(centerLocation);
 
-        // Auto-update city name if we got better details
+        // Auto-update city name if we got better details (especially for pincodes)
+        // Try to construct "City, State" or fallback to display_name
         let niceCityName = formData.city;
         if (address) {
-          const cityComponent = address.city || address.town || address.village || address.city_district || address.county || address.state_district;
+          const cityComponent = address.city || address.town || address.village || address.county || address.state_district;
           const stateComponent = address.state;
           const postcode = address.postcode;
 
           if (cityComponent && stateComponent) {
             niceCityName = `${cityComponent}, ${stateComponent}${postcode ? ' ' + postcode : ''}`;
           } else {
+            // Fallback to shorter display name (first 2 parts)
             niceCityName = display_name.split(',').slice(0, 2).join(',');
           }
         }
@@ -582,7 +577,7 @@ function App() {
         setAddStep(2); // Move to Pick Location
         showToast("Drag the pin to your exact location", "info");
       } else {
-        showToast(`Location not found for "${formData.city}". Try something else.`, "error");
+        showToast("Location not found. Try a different city or pincode.", "error");
         setFormData(finalFormData);
       }
     } catch (err) {
@@ -661,7 +656,7 @@ function App() {
         setAvatarFile(null);
         setAvatarPreview(null);
         setFormData({
-          full_name: '', school_name: '', batch_year: '', profession: '', company: '', city: '', contact_info: '', mobile_number: '', linkedin_url: '', instagram_url: '', pincode: ''
+          full_name: '', school_name: '', batch_year: '', profession: '', company: '', city: '', contact_info: '', mobile_number: '', linkedin_url: '', instagram_url: '', pincode: '', role: 'Student'
         });
         showToast("Pin added successfully!", "success");
       }
@@ -697,55 +692,55 @@ function App() {
             .filter(item => {
               const type = item.type;
               const addr = item.address;
-              const cls = item.class;
 
-              // Include cities, towns, villages, municipalities, or relevant administrative areas
+              // Only include actual cities, towns, villages, or postcodes
               const isValidType = type === 'city' || type === 'town' || type === 'village' ||
-                type === 'municipality' || type === 'postcode' || type === 'city_district' ||
-                type === 'district' || type === 'administrative';
+                type === 'municipality' || type === 'postcode';
 
-              // Must have a city-like component in address
-              const hasCity = addr?.city || addr?.town || addr?.village || addr?.municipality || addr?.city_district;
+              // Must have a city/town/village in address
+              const hasCity = addr?.city || addr?.town || addr?.village;
 
-              // Nominatim 'place' class is usually what we want for cities
-              return (cls === 'place' || cls === 'boundary') && (isValidType || hasCity);
+              return isValidType || hasCity;
             })
             .map(item => {
               const addr = item.address;
-              const city = addr?.city || addr?.town || addr?.village || addr?.municipality || addr?.city_district || addr?.county;
+              const city = addr?.city || addr?.town || addr?.village || addr?.county;
               const state = addr?.state;
               const country = addr?.country;
-              const importance = item.importance || 0;
+              const postcode = addr?.postcode;
 
               // Calculate relevance score
-              const searchTermLower = searchTerm;
-              let score = importance * 100; // Use Nominatim's importance as base
+              let score = 0;
               const cityLower = city?.toLowerCase() || '';
+              const displayLower = item.display_name?.toLowerCase() || '';
 
-              // Exact match boost
-              if (cityLower === searchTermLower) score += 50;
-              // Starts with search term boost
-              else if (cityLower.startsWith(searchTermLower)) score += 20;
+              // Exact match gets highest score
+              if (cityLower === searchTerm) score += 100;
+              // Starts with search term
+              else if (cityLower.startsWith(searchTerm)) score += 50;
+              // Contains search term in city name
+              else if (cityLower.includes(searchTerm)) score += 25;
+              // Check if display name contains search term (for variations/typos)
+              else if (displayLower.includes(searchTerm)) score += 15;
 
-              // Prefer certain types
+              // Prefer cities over towns/villages
               if (item.type === 'city') score += 10;
               else if (item.type === 'town') score += 5;
 
-              // Format display name: "City, State, Country" or "City, Country"
-              let displayName = '';
-              if (city) {
-                const parts = [city];
-                if (state && state !== city) parts.push(state);
-                if (country) parts.push(country);
-                displayName = parts.join(', ');
-              } else {
-                displayName = item.display_name.split(',').slice(0, 3).join(',');
+              // Format display name
+              let displayName = item.display_name;
+              if (city && state) {
+                displayName = `${city}, ${state}`;
+              } else if (city && country) {
+                displayName = `${city}, ${country}`;
+              } else if (postcode && city) {
+                displayName = `${city}, ${postcode}`;
               }
 
               return { ...item, display_name: displayName, score, cityName: city };
             })
-            .filter(item => item.score > 0)
-            .sort((a, b) => b.score - a.score) // Sort by our calculated relevance
+            .filter(item => item.score > 0) // Only show items with relevance
+            .sort((a, b) => b.score - a.score) // Sort by relevance
             .slice(0, 8); // Top 8 results
 
           setFormCitySuggestions(filteredData);
@@ -784,56 +779,58 @@ function App() {
             .filter(item => {
               const type = item.type;
               const addr = item.address;
-              const cls = item.class;
 
-              // Include cities, towns, villages, municipalities, or relevant administrative areas
+              // Include countries, cities, towns, villages, or postcodes
               const isValidType = type === 'city' || type === 'town' || type === 'village' ||
-                type === 'municipality' || type === 'postcode' || type === 'city_district' ||
-                type === 'district' || type === 'administrative';
+                type === 'municipality' || type === 'postcode' || type === 'country';
 
-              // Must have a city-like component in address
-              const hasCity = addr?.city || addr?.town || addr?.village || addr?.municipality || addr?.city_district;
+              // Must have a city/town/village OR be a country
+              const hasCity = addr?.city || addr?.town || addr?.village;
+              const isCountry = type === 'country';
 
-              // Nominatim 'place' class for cities
-              return (cls === 'place' || cls === 'boundary') && (isValidType || hasCity);
+              return isValidType || hasCity || isCountry;
             })
             .map(item => {
               const addr = item.address;
-              const city = addr?.city || addr?.town || addr?.village || addr?.municipality || addr?.city_district || addr?.county;
+              const city = addr?.city || addr?.town || addr?.village || addr?.county;
               const state = addr?.state;
               const country = addr?.country;
-              const importance = item.importance || 0;
+              const postcode = addr?.postcode;
 
               // Calculate relevance score
-              const searchTermLower = searchTerm;
-              let score = importance * 100;
+              let score = 0;
               const cityLower = city?.toLowerCase() || '';
+              const displayLower = item.display_name?.toLowerCase() || '';
 
-              // Exact match boost
-              if (cityLower === searchTermLower) score += 50;
-              // Starts with search term boost
-              else if (cityLower.startsWith(searchTermLower)) score += 20;
+              // Exact match gets highest score
+              if (cityLower === searchTerm) score += 100;
+              // Starts with search term
+              else if (cityLower.startsWith(searchTerm)) score += 50;
+              // Contains search term in city name
+              else if (cityLower.includes(searchTerm)) score += 25;
+              // Check if display name contains search term (for variations/typos)
+              else if (displayLower.includes(searchTerm)) score += 15;
 
-              // Prefer certain types
-              if (item.type === 'city') score += 10;
+              // Prefer countries for country searches, then cities
+              if (item.type === 'country') score += 120;
+              else if (item.type === 'city') score += 10;
               else if (item.type === 'town') score += 5;
 
               // Format display name
-              let displayName = '';
-              if (city) {
-                const parts = [city];
-                if (state && state !== city) parts.push(state);
-                if (country) parts.push(country);
-                displayName = parts.join(', ');
-              } else {
-                displayName = item.display_name.split(',').slice(0, 3).join(',');
+              let displayName = item.display_name;
+              if (city && state) {
+                displayName = `${city}, ${state}`;
+              } else if (city && country) {
+                displayName = `${city}, ${country}`;
+              } else if (postcode && city) {
+                displayName = `${city}, ${postcode}`;
               }
 
               return { ...item, display_name: displayName, score, cityName: city };
             })
-            .filter(item => item.score > 0)
-            .sort((a, b) => b.score - a.score)
-            .slice(0, 8);
+            .filter(item => item.score > 0) // Only show items with relevance
+            .sort((a, b) => b.score - a.score) // Sort by relevance
+            .slice(0, 8); // Top 8 results
 
           setSuggestions(filteredData);
         } catch (err) {
@@ -858,10 +855,10 @@ function App() {
   const selectSuggestion = (s) => {
     const lat = parseFloat(s.lat);
     const lon = parseFloat(s.lon);
-    // Use the formatted display name
+    // Use the formatted display name - only updates local panel state
     setFilterCity(s.display_name);
-    setFlyToLocation([lat, lon]);
     setSearchLocation([lat, lon]);
+    setSearchType(s.type === 'country' ? 'country' : 'city');
     setSuggestions([]);
   };
 
@@ -876,12 +873,49 @@ function App() {
           if (data && data.length > 0) {
             const lat = parseFloat(data[0].lat);
             const lon = parseFloat(data[0].lon);
-            setFlyToLocation([lat, lon]);
+            // Only update coordinates, fly happens on Apply
             setSearchLocation([lat, lon]);
+            setSearchType(data[0].type === 'country' ? 'country' : 'city');
           }
         } catch (err) { }
       }
     }
+  };
+
+  const handleApplySearch = async () => {
+    let loc = searchLocation;
+
+    // If city text exists but no coordinates (haven't selected suggestion or pressed enter)
+    if (!loc && filterCity.trim()) {
+      try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(filterCity)}&accept-language=en&limit=1`);
+        const data = await response.json();
+        if (data && data.length > 0) {
+          loc = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+          setSearchLocation(loc);
+          setSearchType(data[0].type === 'country' ? 'country' : 'city');
+        }
+      } catch (err) { }
+    }
+
+    // Commit all filters to applied state
+    setAppliedCity(filterCity);
+    setAppliedBatchYear(filterBatchYear);
+    setAppliedProfession(filterProfession);
+    setAppliedCompany(filterCompany);
+    setAppliedLocation(loc);
+    setAppliedNearMe(nearMeActive);
+
+    // Fly to the final location with appropriate zoom
+    if (nearMeActive && userLocation) {
+      setFlyToLocation([userLocation.lat, userLocation.lng]);
+      setFlyToZoom(12);
+    } else if (loc) {
+      setFlyToLocation(loc);
+      setFlyToZoom(searchType === 'country' ? 5 : 12);
+    }
+
+    setShowSearchPanel(false);
   };
 
   // --- NEAR ME LOGIC ---
@@ -906,9 +940,8 @@ function App() {
       (position) => {
         const { latitude, longitude } = position.coords;
         setUserLocation({ lat: latitude, lng: longitude });
-        setFlyToLocation([latitude, longitude]);
         setNearMeActive(true);
-        showToast(`Showing ${filterSchool} alumni within 50km`, "success");
+        showToast(`Ready to show ${filterSchool} alumni within 50km`, "success");
       },
       (error) => {
         showToast("Unable to retrieve your location", "error");
@@ -942,29 +975,29 @@ function App() {
 
     const schoolMatch = p.school_name.toLowerCase().includes(filterSchool.toLowerCase());
 
-    // Batch year filter (optional, supports partial matching)
-    const batchMatch = !filterBatchYear.trim() ||
-      (p.batch_year && p.batch_year.toString().includes(filterBatchYear.trim()));
+    // Batch year filter (applied)
+    const batchMatch = !appliedBatchYear.trim() ||
+      (p.batch_year && p.batch_year.toString().includes(appliedBatchYear.trim()));
 
-    // Profession filter (optional)
-    const professionMatch = !filterProfession.trim() ||
-      (p.profession && p.profession.toLowerCase().includes(filterProfession.toLowerCase()));
+    // Profession filter (applied)
+    const professionMatch = !appliedProfession.trim() ||
+      (p.profession && p.profession.toLowerCase().includes(appliedProfession.toLowerCase()));
 
-    // Company filter (optional)
-    const companyMatch = !filterCompany.trim() ||
-      (p.company && p.company.toLowerCase().includes(filterCompany.toLowerCase()));
+    // Company filter (applied)
+    const companyMatch = !appliedCompany.trim() ||
+      (p.company && p.company.toLowerCase().includes(appliedCompany.toLowerCase()));
 
-    // If a specific search location is set (via Enter or Suggestion), filter by distance (50km)
-    if (searchLocation) {
-      const dist = getDistanceFromLatLonInKm(searchLocation[0], searchLocation[1], p.latitude, p.longitude);
+    // Distance-based city filtering (applied)
+    if (appliedLocation) {
+      const dist = getDistanceFromLatLonInKm(appliedLocation[0], appliedLocation[1], p.latitude, p.longitude);
       return schoolMatch && batchMatch && professionMatch && companyMatch && dist <= 50;
     }
 
-    // Otherwise use text-based city filter (or show all if search is empty)
-    const cityMatch = p.city.toLowerCase().includes(filterCity.toLowerCase());
+    // Text-based city filter (applied)
+    const cityMatch = p.city.toLowerCase().includes(appliedCity.toLowerCase());
 
-    // If Near Me is active, also apply proximity filter
-    if (nearMeActive && userLocation) {
+    // Near Me proximity filter (applied)
+    if (appliedNearMe && userLocation) {
       const dist = getDistanceFromLatLonInKm(userLocation.lat, userLocation.lng, p.latitude, p.longitude);
       return schoolMatch && batchMatch && professionMatch && companyMatch && cityMatch && dist <= 50;
     }
@@ -1177,6 +1210,14 @@ function App() {
           </div>
         </div>
 
+        <div className="search-trigger-container">
+          <button className="search-trigger-btn" onClick={() => setShowSearchPanel(true)}>
+            <Search size={18} className="icon" />
+            <span>Search by City, Batch, Profession...</span>
+          </button>
+        </div>
+
+
         <div className="search-input-group" style={{ position: 'relative', display: 'none' }} onClick={e => e.stopPropagation()}>
           <Search size={18} className="icon" />
           <input
@@ -1197,152 +1238,29 @@ function App() {
               }
             }}
           />
-          {showSchoolSearchDropdown && schoolInput && filteredSearchSchools.length > 0 && (
-            <ul className="suggestions-list">
-              {filteredSearchSchools.map((school, i) => (
-                <li key={i} onClick={() => {
-                  setSchoolInput(school);
-                  setFilterSchool(school); // Commit search on click
-                  setShowSchoolSearchDropdown(false);
-                }}>
-                  <School size={14} className="icon-small" />
-                  {school}
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
 
-        <div className="city-search-row">
-          {/* Near Me Button */}
-          <button
-            className={`near-me-btn ${nearMeActive ? 'active' : ''}`}
-            onClick={handleNearMe}
-            title={nearMeActive ? "Exit Near Me" : "Show Alumni Near Me"}
-          >
-            <LocateFixed size={20} />
-          </button>
-
-          {/* Batch Year Filter */}
-          <div className="search-input-group" style={{ position: 'relative', minWidth: '160px' }}>
-            <GraduationCap size={18} className="icon" />
-            <input
-              type="text"
-              placeholder="Batch Year..."
-              value={filterBatchYear}
-              onChange={(e) => {
-                const value = e.target.value.replace(/\D/g, ''); // Only allow numbers
-                setFilterBatchYear(value);
-              }}
-              maxLength={4}
-            />
-          </div>
-
-          <div className="search-input-group" style={{ position: 'relative' }}>
-            <MapPin size={18} className="icon" />
-            <input
-              type="text"
-              placeholder="Search City..."
-              value={filterCity}
-              onChange={handleCityChange}
-              onKeyDown={handleLocationSearch}
-            />
-
-            {/* Suggestions Dropdown */}
-            {suggestions.length > 0 && (
-              <ul className="suggestions-list">
-                {suggestions.map((s) => (
-                  <li key={s.place_id} onClick={() => selectSuggestion(s)}>
-                    <MapPin className="icon-small" />
-                    {s.display_name}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          {/* More Filters Button */}
-          <button
-            className={`more-filters-btn ${showAdvancedFilters ? 'active' : ''}`}
-            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            title="More Filters"
-          >
-            <Briefcase size={18} />
-            <span>Filters</span>
-            {(filterProfession || filterCompany) && (
-              <span className="filter-badge">
-                {[filterProfession, filterCompany].filter(Boolean).length}
-              </span>
-            )}
-            {showAdvancedFilters ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          </button>
-        </div>
-
-        {/* Advanced Filters Panel */}
-        {showAdvancedFilters && (
-          <div className="advanced-filters-panel">
-            <div className="advanced-filters-content">
-              <div className="filter-row">
-                <div className="search-input-group" style={{ flex: 1 }}>
-                  <Briefcase size={18} className="icon" />
-                  <input
-                    type="text"
-                    placeholder="Profession (e.g., Software Engineer)..."
-                    value={filterProfession}
-                    onChange={(e) => setFilterProfession(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="filter-row">
-                <div className="search-input-group" style={{ flex: 1 }}>
-                  <Briefcase size={18} className="icon" />
-                  <input
-                    type="text"
-                    placeholder="Company (e.g., Google)..."
-                    value={filterCompany}
-                    onChange={(e) => setFilterCompany(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {(filterProfession || filterCompany) && (
-                <div className="filter-actions">
-                  <button
-                    className="btn-clear-filters"
-                    onClick={() => {
-                      setFilterProfession('');
-                      setFilterCompany('');
-                    }}
-                  >
-                    Clear Filters
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
       </div>
 
       {/* Sidebar Area (Add Pin Option) */}
       <div className="sidebar-container">
-        {/* Toggle Button / FAB */}
-        <button
-          className={`sidebar-trigger-btn ${addStep > 0 ? 'active' : ''}`}
-          onClick={() => {
-            if (addStep > 0) {
-              setAddStep(0);
-              setNewPinLoc(null);
-            } else {
+        {/* FAB Label (outside box) - Pill Shaped from Mockup */}
+        {addStep === 0 && <span className="trigger-label-pill">ADD YOUR PIN</span>}
+
+        {/* Toggle Button / FAB - Only show when not adding */}
+        {addStep === 0 && (
+          <button
+            className="sidebar-trigger-btn"
+            onClick={() => {
               setFormData({ ...formData, school_name: selectedSchool, city: '' });
               setAddStep(1);
-            }
-          }}
-          title={addStep > 0 ? "Cancel" : "Add Your Pin"}
-        >
-          {addStep > 0 ? <X size={32} /> : <Plus size={32} />}
-        </button>
+            }}
+            title="Add Your Pin"
+          >
+            <Plus size={32} />
+          </button>
+        )}
 
         {/* STEP 1: Complete Information Form */}
         {addStep === 1 && (
@@ -1365,36 +1283,35 @@ function App() {
 
             <form className="add-pin-form" onSubmit={handleStep1Submit} onClick={() => { setFormCitySuggestions([]); }} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
               {/* Scrollable Content Area */}
-              <div className="scroll-fade-area" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingBottom: '20px' }}>
+              <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingBottom: '10px' }}>
                 <p className="section-label">Profile</p>
                 {/* School Name - Pre-filled and disabled */}
                 <input name="school_name" value={formData.school_name} disabled style={{ opacity: 0.7 }} />
 
                 <input name="full_name" placeholder="Full Name" required value={formData.full_name} onChange={handleInputChange} autoFocus />
-
                 <input name="batch_year" placeholder="Batch Year (e.g. 2024)" type="number" value={formData.batch_year} onChange={handleInputChange} />
 
-                {/* Role Selection */}
-                <div style={{ display: 'flex', gap: '20px', margin: '5px 0 10px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>
+                {/* Role Selection: Student / Teacher */}
+                <div style={{ display: 'flex', gap: '25px', margin: '15px 5px', color: 'white', fontWeight: '500' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '1rem' }}>
                     <input
                       type="radio"
                       name="role"
                       value="Student"
                       checked={formData.role === 'Student'}
                       onChange={handleInputChange}
-                      style={{ width: 'auto', margin: 0 }}
+                      style={{ accentColor: '#3b82f6', width: '20px', height: '20px', cursor: 'pointer' }}
                     />
                     Student
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '1rem' }}>
                     <input
                       type="radio"
                       name="role"
                       value="Teacher"
                       checked={formData.role === 'Teacher'}
                       onChange={handleInputChange}
-                      style={{ width: 'auto', margin: 0 }}
+                      style={{ accentColor: '#3b82f6', width: '20px', height: '20px', cursor: 'pointer' }}
                     />
                     Teacher
                   </label>
@@ -1453,16 +1370,7 @@ function App() {
                       <ul className="suggestions-list" style={{ maxHeight: '150px' }}>
                         {formCitySuggestions.map((s) => (
                           <li key={s.place_id} onClick={() => {
-                            // Extract city and postcode from the suggestion
-                            const addr = s.address;
-                            const cityName = addr?.city || addr?.town || addr?.village || addr?.municipality || s.display_name.split(',')[0];
-                            const postcode = addr?.postcode || '';
-
-                            setFormData({
-                              ...formData,
-                              city: cityName,
-                              pincode: postcode || formData.pincode // Fallback to current pincode if none in suggestion
-                            });
+                            setFormData({ ...formData, city: s.display_name.split(',')[0] });
                             setFormCitySuggestions([]);
                           }}>
                             <MapPin size={14} className="icon-small" />
@@ -1491,41 +1399,53 @@ function App() {
                   </div>
                 </div>
 
-                {/* Avatar Upload - Moved to end */}
-                <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid var(--border)' }}>
-                  <p className="section-label">Photo</p>
-                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                {/* Avatar Upload - Moved to last */}
+                <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid var(--border)' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Profile Picture (max 200KB)
                   </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="user"
-                    onChange={handleAvatarChange}
-                    style={{
-                      padding: '8px',
-                      border: '1px solid var(--border)',
-                      borderRadius: '8px',
-                      backgroundColor: 'var(--bg-card)',
-                      color: 'var(--text-main)',
-                      width: '100%'
-                    }}
-                  />
-                  {avatarPreview && (
-                    <div style={{ marginTop: '10px', textAlign: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <div style={{ flex: 1 }}>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="user"
+                        id="avatar-upload"
+                        onChange={handleAvatarChange}
+                        style={{ display: 'none' }}
+                      />
+                      <label
+                        htmlFor="avatar-upload"
+                        style={{
+                          display: 'block',
+                          padding: '12px',
+                          border: '1px dashed var(--border)',
+                          borderRadius: '12px',
+                          backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                          color: 'var(--text-main)',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {avatarFile ? avatarFile.name : 'Choose File or Take Photo'}
+                      </label>
+                    </div>
+                    {avatarPreview && (
                       <img
                         src={avatarPreview}
                         alt="Preview"
                         style={{
-                          width: '80px',
-                          height: '80px',
-                          borderRadius: '50%',
+                          width: '50px',
+                          height: '50px',
+                          borderRadius: '12px',
                           objectFit: 'cover',
                           border: '2px solid var(--accent)'
                         }}
                       />
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1672,8 +1592,8 @@ function App() {
         attributionControl={false}
         className={zoomLevel >= 10 ? 'show-marker-labels' : ''}
       >
-        <MapController center={flyToLocation} />
-
+        <MapController center={flyToLocation} zoom={flyToZoom} />
+        <ZoomTracker setZoomLevel={setZoomLevel} />
         {/* Google Maps Tiles - Colorful & Strictly English (hl=en) */}
         <TileLayer
           attribution='&copy; Google Maps'
@@ -1688,8 +1608,8 @@ function App() {
             // Also close sidebar form suggestions if open
             setShowSchoolDropdown(false);
             setFormCitySuggestions([]);
-            // Close advanced filters panel
-            setShowAdvancedFilters(false);
+            // Close search panel
+            setShowSearchPanel(false);
           }}
           setZoom={setZoomLevel}
         />
@@ -1963,11 +1883,115 @@ function App() {
       </MapContainer >
 
 
-      <Analytics />
+      {/* Search Panel Overlay */}
+      {showSearchPanel && (
+        <div className="search-panel-overlay" onClick={() => setShowSearchPanel(false)}>
+          <div className="search-panel" onClick={e => e.stopPropagation()}>
+            <div className="search-panel-header">
+              <h2>Search</h2>
+              <button className="btn-icon-close" onClick={() => setShowSearchPanel(false)}>
+                <X size={20} />
+              </button>
+            </div>
 
-      {/* Credits */}
+            <div className="search-panel-grid">
+              <div className="search-input-group">
+                <MapPin size={18} className="icon" />
+                <input
+                  type="text"
+                  placeholder="Search City..."
+                  value={filterCity}
+                  onChange={handleCityChange}
+                  onKeyDown={(e) => {
+                    handleLocationSearch(e);
+                  }}
+                />
+                {suggestions.length > 0 && (
+                  <ul className="suggestions-list" style={{ top: '100%', left: 0, width: '100%', zIndex: 3000 }}>
+                    {suggestions.map((s) => (
+                      <li key={s.place_id} onClick={() => {
+                        selectSuggestion(s);
+                      }}>
+                        <MapPin className="icon-small" />
+                        {s.display_name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="search-input-group">
+                <GraduationCap size={18} className="icon" />
+                <input
+                  type="text"
+                  placeholder="Batch (e.g., 2024)..."
+                  value={filterBatchYear}
+                  onChange={(e) => setFilterBatchYear(e.target.value.replace(/\D/g, ''))}
+                  maxLength={4}
+                />
+              </div>
+
+              <div className="search-input-group">
+                <Briefcase size={18} className="icon" />
+                <input
+                  type="text"
+                  placeholder="Profession..."
+                  value={filterProfession}
+                  onChange={(e) => setFilterProfession(e.target.value)}
+                />
+              </div>
+
+              <div className="search-input-group">
+                <Briefcase size={18} className="icon" />
+                <input
+                  type="text"
+                  placeholder="Company..."
+                  value={filterCompany}
+                  onChange={(e) => setFilterCompany(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="search-panel-footer">
+              {(filterCity || filterBatchYear || filterProfession || filterCompany) && (
+                <button
+                  className="btn-clear-filters"
+                  style={{ marginRight: 'auto' }}
+                  onClick={() => {
+                    setFilterCity('');
+                    setFilterBatchYear('');
+                    setFilterProfession('');
+                    setFilterCompany('');
+                    setNearMeActive(false);
+                  }}
+                >
+                  Clear All
+                </button>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                <button
+                  className={`near-me-btn ${nearMeActive ? 'active' : ''}`}
+                  style={{ height: '42px', width: '42px', margin: 0 }}
+                  onClick={() => {
+                    handleNearMe();
+                  }}
+                >
+                  <LocateFixed size={20} />
+                </button>
+                <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Near Me</span>
+              </div>
+              <button className="btn-search-apply" onClick={handleApplySearch}>
+                Show Results
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Analytics />
       <PoweredBy />
-    </div >
+    </div>
+
   );
 }
 
